@@ -67,7 +67,7 @@ RUN_E2E_GDB=1 ./scripts/validate_local.sh
 
 To debug a **real Zephyr app** (still RSP/gdbserver) without QEMU or hardware, build for the **`native_sim`** board: Zephyr links a normal Linux executable (`zephyr.exe`). Flow matches CI: **gdbserver → rsgdb → GDB**.
 
-Requires a full [Zephyr west workspace](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) (`ZEPHYR_WORKSPACE` with `.west/` and `zephyr/`). See [native_sim](https://docs.zephyrproject.org/latest/boards/native/native_sim/doc/index.html).
+Requires a full [Zephyr west workspace](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) (`ZEPHYR_WORKSPACE` with `.west/` and `zephyr/`). See [native_sim](https://docs.zephyrproject.org/latest/boards/native/native_sim/doc/index.html). The script builds **`native_sim/native/64`** by default (LP64 host binary); the plain `native_sim` target is 32-bit and needs multilib on x86_64.
 
 ```bash
 export ZEPHYR_WORKSPACE=/path/to/zephyrproject

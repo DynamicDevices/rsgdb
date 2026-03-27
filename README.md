@@ -200,7 +200,7 @@ cargo test
 # cargo build --release && ./scripts/e2e_gdb_smoke.sh
 # Or: RUN_E2E_GDB=1 ./scripts/validate_local.sh
 #
-# Optional: Zephyr native_sim (Linux ELF) — needs ZEPHYR_WORKSPACE; see CONTRIBUTING.md
+# Optional: Zephyr native_sim (Linux ELF) — needs ZEPHYR_WORKSPACE; default board is native_sim/native/64
 # ./scripts/e2e_zephyr_native_sim.sh
 # Or: RUN_E2E_ZEPHYR_NATIVE=1 ./scripts/validate_local.sh
 

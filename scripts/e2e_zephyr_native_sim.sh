@@ -14,6 +14,7 @@
 #
 # Optional:
 #   ZEPHYR_APP=zephyr/samples/hello_world   (path relative to workspace root)
+#   ZEPHYR_BOARD=native_sim/native/64       (default: 64-bit LP64 — works on typical x86_64 Linux without gcc-multilib)
 #   RSGDB, GDB_PORT, PROXY_PORT — same as e2e_gdb_smoke.sh
 #
 # CI: not run by default (heavy); set RUN_E2E_ZEPHYR_NATIVE=1 in validate_local.sh locally.
@@ -53,6 +54,8 @@ if ! command -v gcc >/dev/null 2>&1 && ! command -v clang >/dev/null 2>&1; then
 fi
 
 ZEPHYR_APP="${ZEPHYR_APP:-zephyr/samples/hello_world}"
+# Default board is 64-bit native_sim so linking does not require 32-bit multilib (-m32 + libgcc).
+ZEPHYR_BOARD="${ZEPHYR_BOARD:-native_sim/native/64}"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"; kill ${RSGDB_PID:-0} ${GDBSERVER_PID:-0} 2>/dev/null || true' EXIT
 
@@ -60,10 +63,10 @@ GDB_PORT="${GDB_PORT:-13335}"
 PROXY_PORT="${PROXY_PORT:-13336}"
 BUILD_DIR="$WORKDIR/native_sim_build"
 
-echo "==> west build -b native_sim (first run can take several minutes)"
+echo "==> west build -b $ZEPHYR_BOARD (first run can take several minutes)"
 (
   cd "$ZEPHYR_WORKSPACE"
-  west build -b native_sim -p auto -d "$BUILD_DIR" "$ZEPHYR_APP" -- \
+  west build -b "$ZEPHYR_BOARD" -p auto -d "$BUILD_DIR" "$ZEPHYR_APP" -- \
     -DCONFIG_NO_OPTIMIZATIONS=y
 )
 
