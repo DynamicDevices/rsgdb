@@ -63,6 +63,24 @@ To run the same check as part of local validation (after installing the tools ab
 RUN_E2E_GDB=1 ./scripts/validate_local.sh
 ```
 
+### Zephyr as a Linux process (`native_sim`, optional)
+
+To debug a **real Zephyr app** (still RSP/gdbserver) without QEMU or hardware, build for the **`native_sim`** board: Zephyr links a normal Linux executable (`zephyr.exe`). Flow matches CI: **gdbserver → rsgdb → GDB**.
+
+Requires a full [Zephyr west workspace](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) (`ZEPHYR_WORKSPACE` with `.west/` and `zephyr/`). See [native_sim](https://docs.zephyrproject.org/latest/boards/native/native_sim/doc/index.html).
+
+```bash
+export ZEPHYR_WORKSPACE=/path/to/zephyrproject
+cargo build --release
+./scripts/e2e_zephyr_native_sim.sh
+```
+
+First build can take several minutes. GDB is **host** `gdb` (not `arm-none-eabi-gdb`) because the ELF matches your machine.
+
+```bash
+RUN_E2E_ZEPHYR_NATIVE=1 ./scripts/validate_local.sh
+```
+
 ### Issue tracking
 
 Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issues). **Blocked-by** dependencies define order (e.g. Part A **#1 → #3**; **#2** can run in parallel). Close an issue from a PR with `Closes #N` when it is fully done.

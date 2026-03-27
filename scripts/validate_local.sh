@@ -24,4 +24,10 @@ if [[ "${RUN_E2E_GDB:-}" == "1" ]]; then
   ./scripts/e2e_gdb_smoke.sh
 fi
 
+if [[ "${RUN_E2E_ZEPHYR_NATIVE:-}" == "1" ]]; then
+  echo "==> e2e Zephyr native_sim (west build -> gdbserver -> rsgdb -> gdb batch)"
+  cargo build --release
+  ./scripts/e2e_zephyr_native_sim.sh
+fi
+
 echo "==> OK — all local checks passed."

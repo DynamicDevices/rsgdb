@@ -199,6 +199,10 @@ cargo test
 # Optional: real GDB session through the proxy (needs gcc, gdb, gdbserver)
 # cargo build --release && ./scripts/e2e_gdb_smoke.sh
 # Or: RUN_E2E_GDB=1 ./scripts/validate_local.sh
+#
+# Optional: Zephyr native_sim (Linux ELF) — needs ZEPHYR_WORKSPACE; see CONTRIBUTING.md
+# ./scripts/e2e_zephyr_native_sim.sh
+# Or: RUN_E2E_ZEPHYR_NATIVE=1 ./scripts/validate_local.sh
 
 # Run with logging (also respects [logging] in rsgdb.toml after init)
 RUST_LOG=debug cargo run
@@ -211,7 +215,8 @@ rsgdb/
 ├── src/                     # Library + CLI
 ├── tests/                   # Integration tests
 ├── scripts/validate_local.sh
-├── scripts/e2e_gdb_smoke.sh # gdbserver → rsgdb → gdb (batch); CI E2E job
+├── scripts/e2e_gdb_smoke.sh      # gdbserver → rsgdb → gdb (batch); CI E2E job
+├── scripts/e2e_zephyr_native_sim.sh  # optional: west build native_sim → same chain
 ├── rsgdb.toml.example
 └── .github/workflows/
 ```
