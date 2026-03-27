@@ -15,7 +15,7 @@ A Rust GDB **RSP proxy** with structured logging, optional CMSIS-SVD memory labe
 - **Advanced Breakpoint Management** (roadmap): Named breakpoints, conditional expressions, and hardware/software optimization — config and parsing exist; the proxy today **forwards** breakpoint RSP unchanged
 - **State Inspection** (partial today): Peripheral/register **labels** for memory traffic via CMSIS-SVD in logs; snapshots / deep state are not implemented yet
 - **Session Management**: JSONL **recording** and **`rsgdb replay`** mock-backend playback (see below)
-- **Backend Flexibility**: Support for multiple debug probes (probe-rs, OpenOCD, pyOCD)
+- **Backend Flexibility** (today): The proxy speaks **TCP** to whatever GDB stub you run (OpenOCD, probe-rs GDB port, `gdbserver`, …). `[backend].backend_type` / `--backend` is reserved for **future** native integration ([#9](https://github.com/DynamicDevices/rsgdb/issues/9)); it does not select a transport yet.
 - **Modern Architecture**: Built with Rust for safety, performance, and reliability
 
 ## ✨ Key Features
@@ -294,8 +294,8 @@ Source of truth for ordering and scope: **[GitHub Issues](https://github.com/Dyn
 |------------------|---------------|-------|
 | **Foundation + proxy** | RSP codec, TCP proxy, config, logging, CI (incl. GDB + Zephyr E2E), session record (JSONL), SVD labels, flash orchestration, RTOS decode/log | Closed: [#1–#8](https://github.com/DynamicDevices/rsgdb/issues?q=is%3Aissue+is%3Aclosed) |
 | **Next: native backend** | Probe-facing backend beyond TCP to a stub (see `backends::connect_tcp_backend`) | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (open) |
-| **Replay** | `rsgdb replay` + mock TCP backend from `.jsonl` | [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (implemented; close when shipped) |
-| **Richer SVD** | Overlapping fields + enum variant names in annotations; value decode / recording correlation follow-ups | [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (baseline in-tree) |
+| **Replay** | `rsgdb replay` + mock TCP backend from `.jsonl` | [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (closed) |
+| **Richer SVD** | Overlapping fields + enum variant names in annotations; value decode / recording correlation follow-ups | [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (baseline closed; follow-ups optional) |
 
 Older versioned bullets (v0.2–v0.4) below are **aspirational**; issue titles supersede them.
 

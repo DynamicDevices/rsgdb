@@ -2,6 +2,10 @@
 //!
 //! Advanced breakpoint management with support for named, conditional,
 //! and grouped breakpoints.
+//!
+//! **Status — scaffold:** types and config exist; the TCP proxy does not run a breakpoint
+//! manager on the wire yet (RSP `Z`/`z` packets are forwarded unchanged). Safe to ignore unless
+//! you are extending this API.
 
 /// Breakpoint type
 #[derive(Debug, Clone, PartialEq)]

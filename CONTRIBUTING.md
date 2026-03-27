@@ -107,9 +107,13 @@ RUN_E2E_ZEPHYR_NATIVE=1 ./scripts/validate_local.sh
 
 Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issues). **Blocked-by** dependencies define order (e.g. Part A **#1 → #3**; **#2** can run in parallel). Close an issue from a PR with `Closes #N` when it is fully done.
 
-**Status (short):** Part A (**#1–#3**), session recording (**#4**), SVD baseline (**#5**), breakpoint/semihosting spike (**#6**), flash orchestration (**#7**), RTOS decode/log (**#8**) are **closed**. **Phase A/B** (RSP matrix + proxy tests, gdbinit, backend thread reply logging) are in-tree; see README. **CI:** main workflow (**CI**) + optional **Zephyr E2E** (`native_sim`, debug `rsgdb`, west venv + `pyelftools`) — both green on `main`.
+**Foundation (closed issues):** Part A (**#1–#3**), session recording (**#4**), SVD baseline (**#5**), breakpoint/semihosting spike (**#6**), flash (**#7**), RTOS decode/log (**#8**). **Phase A/B** in-tree: RSP matrix + proxy tests, gdbinit example, `rsgdb::rtos` decode logs — see README **Key Features**.
 
-**Next roadmap focus (open):** [#9](https://github.com/DynamicDevices/rsgdb/issues/9) native probe / backend beyond TCP. **In-tree:** session replay ([#10](https://github.com/DynamicDevices/rsgdb/issues/10) — `rsgdb replay`), SVD field + enum labels in memory annotations ([#11](https://github.com/DynamicDevices/rsgdb/issues/11) — baseline; correlation with recordings may remain on the issue).
+**Current capabilities (same as README “Current”):** RSP codec + TCP proxy, `tracing` logging, TOML/env config, JSONL **record** + **`rsgdb replay`**, SVD register/field/enum-name memory annotations, `rsgdb flash`, RTOS packet summaries, CI + optional GDB/Zephyr E2E scripts.
+
+**Roadmap — open:** [#9](https://github.com/DynamicDevices/rsgdb/issues/9) native / non-TCP backend beyond `connect_tcp_backend`. **Optional follow-ups:** SVD value decode + recording correlation (see [#11](https://github.com/DynamicDevices/rsgdb/issues/11) history); TUI, logging export, proxy-side breakpoint management — open an issue before large changes.
+
+**CI:** Workflow **CI** + optional **Zephyr E2E** — green on `main` (see workflow files).
 
 **CI jobs (overview):** Workflow **CI**: `test` (matrix), `fmt`, `clippy`, `docs`, `e2e-gdb-smoke`, `coverage`, `build` (artifacts; upload may use `continue-on-error` for transient infra). Workflow **Zephyr E2E**: west + SDK + `scripts/e2e_zephyr_native_sim.sh` (path / schedule / `workflow_dispatch`).
 
