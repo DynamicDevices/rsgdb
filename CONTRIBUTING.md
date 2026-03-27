@@ -67,6 +67,10 @@ RUN_E2E_GDB=1 ./scripts/validate_local.sh
 
 Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issues). **Blocked-by** dependencies define order (e.g. Part A **#1 → #3**; **#2** can run in parallel). Close an issue from a PR with `Closes #N` when it is fully done.
 
+**Status (short):** Part A (**#1–#3**) and session recording (**#4**) are closed. **Automated checks** include `cargo test`, `tests/proxy_integration.rs`, `./scripts/validate_local.sh`, and CI job **E2E GDB smoke** (`./scripts/e2e_gdb_smoke.sh` on Ubuntu). **Next roadmap work** starts with **#5** (SVD annotation), then **#6–#9** by phase (see issue titles and labels).
+
+**CI jobs (overview):** `test` (matrix), `fmt`, `clippy`, `docs`, `e2e-gdb-smoke`, `coverage`, `build` (artifacts).
+
 ### Remote board smoke (manual)
 
 Use this when a probe and target are available (optional OpenOCD or probe-rs GDB port):

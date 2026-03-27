@@ -25,6 +25,7 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 🚧 Structured logging infrastructure
 - 🚧 Configuration system
 - 💾 **Session recording (rsgdb-record v1)** — ordered RSP trace as JSON Lines (`.jsonl`)
+- 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), script `scripts/e2e_gdb_smoke.sh`; GitHub Actions job **E2E GDB smoke** (Ubuntu). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Planned
 - 📊 Enhanced logging with filtering and export (JSON, CSV)
@@ -152,6 +153,10 @@ cargo test
 # Match CI before pushing (fmt, clippy, tests --all-features, doc)
 ./scripts/validate_local.sh
 
+# Optional: real GDB session through the proxy (needs gcc, gdb, gdbserver)
+# cargo build --release && ./scripts/e2e_gdb_smoke.sh
+# Or: RUN_E2E_GDB=1 ./scripts/validate_local.sh
+
 # Run with logging (also respects [logging] in rsgdb.toml after init)
 RUST_LOG=debug cargo run
 ```
@@ -163,6 +168,7 @@ rsgdb/
 ├── src/                     # Library + CLI
 ├── tests/                   # Integration tests
 ├── scripts/validate_local.sh
+├── scripts/e2e_gdb_smoke.sh # gdbserver → rsgdb → gdb (batch); CI E2E job
 ├── rsgdb.toml.example
 └── .github/workflows/
 ```
