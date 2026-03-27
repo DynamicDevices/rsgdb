@@ -26,6 +26,7 @@ pub mod backends;
 pub mod breakpoints;
 pub mod config;
 pub mod error;
+pub mod flash;
 pub mod logger;
 mod logging_setup;
 pub mod protocol;
@@ -36,7 +37,7 @@ pub mod svd;
 pub mod ui;
 
 // Re-export commonly used types
-pub use config::{Config, SvdConfig};
+pub use config::{Config, FlashConfig, SvdConfig};
 pub use error::{Result, RsgdbError};
 pub use logging_setup::{init_from_logging_config, LoggingInitGuard};
 

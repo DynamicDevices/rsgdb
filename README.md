@@ -26,6 +26,7 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 🚧 Configuration system
 - 💾 **Session recording (rsgdb-record v1)** — ordered RSP trace as JSON Lines (`.jsonl`)
 - 📝 **SVD annotation (read-only)** — CMSIS-SVD file → log labels for memory RSP (`m` / `M`) as `Peripheral.REGISTER` (`target: rsgdb::svd`, debug level)
+- ⚡ **`rsgdb flash`** — run a configured external flash tool (`[flash].program` with `{image}` substitution; OpenOCD/probe-rs/etc.)
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), script `scripts/e2e_gdb_smoke.sh`; GitHub Actions job **E2E GDB smoke** (Ubuntu). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Planned
@@ -104,6 +105,25 @@ When enabled, each GDB↔backend connection writes one **JSON Lines** file under
 **Enable:** `rsgdb --record`, or set `[recording] enabled = true` in config, or `RSGDB_RECORD=1`. Optional directory override: `--record-dir DIR` or `RSGDB_RECORD_DIR`.
 
 **Replay:** There is no built-in replayer yet. Inspect `.jsonl` with your usual tools or `jq`; a future release may add a mock server for automated replay.
+
+### Flash orchestration (`rsgdb flash`)
+
+rsgdb does not embed flash algorithms; it **runs a configured external command** (OpenOCD `program`, `probe-rs download`, a wrapper script, etc.). Put an argv template in `[flash].program`; at least one element must contain the placeholder `{image}`, which is replaced by the **absolute** path to the firmware file you pass on the CLI.
+
+```toml
+[flash]
+program = [
+  "openocd",
+  "-f", "board.cfg",
+  "-c", "init; reset halt; program {image} verify; reset run; shutdown",
+]
+```
+
+```bash
+rsgdb flash --config rsgdb.toml build/zephyr/zephyr.signed.bin
+```
+
+Stdin is closed; stdout/stderr are inherited so tool output appears in your terminal. Non-zero exit status is surfaced as an error.
 
 ## 📖 Documentation
 

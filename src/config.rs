@@ -32,6 +32,17 @@ pub struct Config {
     /// CMSIS-SVD file for read-only peripheral/register annotation (memory RSP)
     #[serde(default)]
     pub svd: SvdConfig,
+
+    /// External flash programming command (`rsgdb flash`)
+    #[serde(default)]
+    pub flash: FlashConfig,
+}
+
+/// argv template for `rsgdb flash`; each string may contain `{image}` (replaced by the firmware path).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FlashConfig {
+    #[serde(default)]
+    pub program: Vec<String>,
 }
 
 /// Optional CMSIS-SVD path. When set, memory `m`/`M` packets are annotated in logs (`target: rsgdb::svd`).

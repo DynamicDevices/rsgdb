@@ -3,8 +3,9 @@
 //! Main entry point for the rsgdb application.
 
 use anyhow::Context;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use rsgdb::config::Config;
+use rsgdb::flash;
 use rsgdb::proxy::ProxyServer;
 use rsgdb::svd::SvdIndex;
 use rsgdb::{init_from_logging_config, LoggingInitGuard};
@@ -12,10 +13,37 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{error, info};
 
-/// Command-line arguments
+/// Top-level CLI: default command is the GDB proxy; `flash` runs an external programmer from config.
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
+#[command(name = "rsgdb", author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+    #[command(flatten)]
+    proxy: ProxyArgs,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Flash firmware using `[flash].program` in config (orchestrates OpenOCD, probe-rs, etc.)
+    Flash {
+        /// Firmware image (binary, ELF, or whatever your tool expects)
+        #[arg(value_name = "IMAGE")]
+        image: PathBuf,
+        /// Configuration file (`[flash]` section)
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+        #[arg(short, long)]
+        verbose: bool,
+        #[arg(short, long)]
+        debug: bool,
+    },
+}
+
+/// Proxy mode — used when no subcommand is given.
+#[derive(Parser, Debug)]
+struct ProxyArgs {
     /// Path to configuration file
     #[arg(short, long, value_name = "FILE")]
     config: Option<PathBuf>,
@@ -59,8 +87,50 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    let cli = Cli::parse();
 
+    match cli.command {
+        Some(Commands::Flash {
+            image,
+            config,
+            verbose,
+            debug,
+        }) => run_flash_main(&image, config.as_deref(), verbose, debug),
+        None => run_proxy(cli.proxy).await,
+    }
+}
+
+fn run_flash_main(
+    image: &Path,
+    config_path: Option<&Path>,
+    verbose: bool,
+    debug: bool,
+) -> anyhow::Result<()> {
+    let mut config = if let Some(path) = config_path {
+        Config::from_file(path)?
+    } else {
+        Config::default()
+    };
+
+    config.merge_env();
+
+    config.validate().map_err(|e| anyhow::anyhow!(e))?;
+
+    let _log_guard: LoggingInitGuard = init_from_logging_config(&config.logging, verbose, debug)
+        .map_err(|e| anyhow::anyhow!("logging init: {}", e))?;
+
+    info!(
+        image = %image.display(),
+        "Flash orchestration"
+    );
+
+    flash::run_flash(&config.flash, image).context("flash command failed")?;
+
+    info!("Flash finished successfully");
+    Ok(())
+}
+
+async fn run_proxy(args: ProxyArgs) -> anyhow::Result<()> {
     let mut config = if let Some(config_path) = &args.config {
         Config::from_file(config_path)?
     } else {
@@ -93,7 +163,7 @@ async fn main() -> anyhow::Result<()> {
         config.svd.path = Some(svd.to_string_lossy().into_owned());
     }
 
-    config.validate()?;
+    config.validate().map_err(|e| anyhow::anyhow!(e))?;
 
     let svd_index: Option<Arc<SvdIndex>> = match config
         .svd
