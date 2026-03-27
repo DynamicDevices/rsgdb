@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device schemaVersion="1.1" xmlns:xs="http://www.w3.org/2001/XMLSchema-instance" xs:noNamespaceSchemaLocation="CMSIS-SVD_Schema_1_1.xsd">
+  <name>TESTMCU</name>
+  <version>1.0</version>
+  <description>Minimal fixture for SVD tests</description>
+  <addressUnitBits>8</addressUnitBits>
+  <width>32</width>
+  <peripherals>
+    <peripheral>
+      <name>GPIOA</name>
+      <baseAddress>0x40020000</baseAddress>
+      <registers>
+        <register>
+          <name>MODER</name>
+          <addressOffset>0x0</addressOffset>
+          <size>32</size>
+        </register>
+        <register>
+          <name>BSRR</name>
+          <addressOffset>0x18</addressOffset>
+          <size>32</size>
+        </register>
+      </registers>
+    </peripheral>
+  </peripherals>
+</device>
