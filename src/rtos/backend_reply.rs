@@ -29,7 +29,8 @@ pub fn summarize_backend_thread_payload(data: &[u8]) -> Option<String> {
     }
 
     // qThreadExtraInfo reply: hex-encoded UTF-8 name (ASCII hex digits only).
-    if data.len() >= 2 && data.len() % 2 == 0 && data.iter().all(|b| b.is_ascii_hexdigit()) {
+    if data.len() >= 2 && data.len().is_multiple_of(2) && data.iter().all(|b| b.is_ascii_hexdigit())
+    {
         if let Ok(bytes) = hex::decode(data) {
             if let Ok(text) = String::from_utf8(bytes) {
                 if text.len() <= 512 {

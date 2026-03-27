@@ -34,6 +34,9 @@ jobs:
     name: native_sim (gdbserver → rsgdb → gdb)
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      # Required by Zephyr CMake (host tools + toolchain metadata); matches Zephyr 4.x expectations.
+      ZEPHYR_SDK_INSTALL_DIR: /home/runner/zephyr-sdk-0.17.4
     steps:
       - uses: actions/checkout@v4
 
@@ -61,6 +64,23 @@ jobs:
           echo "${{ github.workspace }}/.venv-west/bin" >> "$GITHUB_PATH"
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Zephyr SDK
+        id: zephyr-sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/zephyr-sdk-0.17.4
+          key: zephyr-sdk-0.17.4-linux-x64-v1
+
+      - name: Install Zephyr SDK
+        if: steps.zephyr-sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          cd /tmp
+          wget -qO zephyr-sdk.tar.xz \
+            https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.17.4/zephyr-sdk-0.17.4_linux-x86_64.tar.xz
+          tar xf zephyr-sdk.tar.xz -C /home/runner
+          # CMake finds Zephyr-sdk via ZEPHYR_SDK_INSTALL_DIR (see Zephyr SDK install docs).
 
       - name: Cache Zephyr west workspace
         uses: actions/cache@v4
