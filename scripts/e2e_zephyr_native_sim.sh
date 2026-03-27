@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Build Zephyr hello_world for native_sim (runs as a normal Linux process), then:
-#   gdbserver -> rsgdb -> GDB (batch).
-#
-# Use this to exercise rsgdb against a real embedded-style ELF without hardware.
+# Build a tiny Zephyr app (scripts/zephyr_multi_printf_app) for native_sim, then:
+#   gdbserver -> rsgdb -> GDB (batch): break first printf, next, next; check RSGDB_E2E log lines.
 #
 # Prerequisites (host):
 #   - Zephyr west workspace with SDK / toolchain (Getting Started guide).
@@ -13,11 +11,11 @@
 #   ./scripts/e2e_zephyr_native_sim.sh
 #
 # Optional:
-#   ZEPHYR_APP=zephyr/samples/hello_world   (path relative to workspace root)
-#   ZEPHYR_BOARD=native_sim/native/64       (default: 64-bit LP64 — works on typical x86_64 Linux without gcc-multilib)
-#   RSGDB, GDB_PORT, PROXY_PORT — same as e2e_gdb_smoke.sh
+#   ZEPHYR_APP_SOURCE_DIR=/abs/path/to/app   (west -s; default: rsgdb/scripts/zephyr_multi_printf_app)
+#   ZEPHYR_BOARD=native_sim/native/64
+#   RSGDB, GDB_PORT, PROXY_PORT
 #
-# CI: not run by default (heavy); set RUN_E2E_ZEPHYR_NATIVE=1 in validate_local.sh locally.
+# CI: not run by default; set RUN_E2E_ZEPHYR_NATIVE=1 in validate_local.sh locally.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,26 +45,34 @@ for cmd in gdb gdbserver west; do
   fi
 done
 
-# native_sim links with host gcc; ensure a C compiler exists for the Zephyr build.
 if ! command -v gcc >/dev/null 2>&1 && ! command -v clang >/dev/null 2>&1; then
   echo "error: need a host C compiler (gcc or clang) for native_sim." >&2
   exit 1
 fi
 
-ZEPHYR_APP="${ZEPHYR_APP:-zephyr/samples/hello_world}"
-# Default board is 64-bit native_sim so linking does not require 32-bit multilib (-m32 + libgcc).
+ZEPHYR_APP_SOURCE_DIR="${ZEPHYR_APP_SOURCE_DIR:-$ROOT/scripts/zephyr_multi_printf_app}"
 ZEPHYR_BOARD="${ZEPHYR_BOARD:-native_sim/native/64}"
+# First printf() in zephyr_multi_printf_app/src/main.c (keep in sync with that file).
+FIRST_PRINTF_LINE=9
+
+APP_MAIN_SRC="$ZEPHYR_APP_SOURCE_DIR/src/main.c"
+if [[ ! -f "$APP_MAIN_SRC" ]]; then
+  echo "error: missing $APP_MAIN_SRC" >&2
+  exit 1
+fi
+
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"; kill ${RSGDB_PID:-0} ${GDBSERVER_PID:-0} 2>/dev/null || true' EXIT
 
 GDB_PORT="${GDB_PORT:-13335}"
 PROXY_PORT="${PROXY_PORT:-13336}"
 BUILD_DIR="$WORKDIR/native_sim_build"
+GDBSERVER_LOG="$WORKDIR/gdbserver.log"
 
-echo "==> west build -b $ZEPHYR_BOARD (first run can take several minutes)"
+echo "==> west build -b $ZEPHYR_BOARD -s $ZEPHYR_APP_SOURCE_DIR (first run can take several minutes)"
 (
   cd "$ZEPHYR_WORKSPACE"
-  west build -b "$ZEPHYR_BOARD" -p auto -d "$BUILD_DIR" "$ZEPHYR_APP" -- \
+  west build -b "$ZEPHYR_BOARD" -p auto -d "$BUILD_DIR" -s "$ZEPHYR_APP_SOURCE_DIR" -- \
     -DCONFIG_NO_OPTIMIZATIONS=y
 )
 
@@ -95,8 +101,8 @@ wait_listen() {
   return 1
 }
 
-echo "==> gdbserver 127.0.0.1:$GDB_PORT (Zephyr native_sim zephyr.exe)"
-gdbserver "127.0.0.1:$GDB_PORT" "$ZEPHYR_EXE" &
+echo "==> gdbserver 127.0.0.1:$GDB_PORT (log: $GDBSERVER_LOG)"
+gdbserver "127.0.0.1:$GDB_PORT" "$ZEPHYR_EXE" >"$GDBSERVER_LOG" 2>&1 &
 GDBSERVER_PID=$!
 wait_listen "$GDB_PORT"
 
@@ -105,33 +111,42 @@ echo "==> rsgdb :$PROXY_PORT -> 127.0.0.1:$GDB_PORT"
 RSGDB_PID=$!
 wait_listen "$PROXY_PORT"
 
-# hello_world sample: printf is on line 11 of src/main.c (see Zephyr tree).
-HELLO_SRC="$ZEPHYR_WORKSPACE/zephyr/samples/hello_world/src/main.c"
-if [[ ! -f "$HELLO_SRC" ]]; then
-  echo "error: expected $HELLO_SRC (hello_world sample)" >&2
-  exit 1
-fi
-
-echo "==> gdb batch (host gdb — breakpoint on hello_world printf line)"
+echo "==> gdb batch: break first printf (line $FIRST_PRINTF_LINE), continue, next, next"
 OUT=$(gdb -nx --batch \
   -ex "set pagination off" \
+  -ex "set debuginfod enabled off" \
   -ex "target extended-remote 127.0.0.1:$PROXY_PORT" \
-  -ex "break \"$HELLO_SRC\":11" \
+  -ex "break \"$APP_MAIN_SRC\":$FIRST_PRINTF_LINE" \
   -ex "continue" \
-  -ex "list" \
+  -ex "next" \
+  -ex "next" \
   -ex "quit" \
   "$ZEPHYR_EXE" 2>&1) || true
 
+echo "--- gdb output ---"
 echo "$OUT"
+echo "--- gdbserver / inferior log ($GDBSERVER_LOG) ---"
+cat "$GDBSERVER_LOG"
+echo "--- end logs ---"
 
 if ! echo "$OUT" | grep -qE 'Breakpoint|Temporary breakpoint'; then
   echo "error: expected GDB to set a breakpoint" >&2
   exit 1
 fi
 
-if ! echo "$OUT" | grep -qE 'hello_world/src/main\.c:11|main\.c:11'; then
-  echo "error: expected GDB to stop at hello_world/src/main.c line 11 (printf)" >&2
+if ! echo "$OUT" | grep -qF "main.c:$FIRST_PRINTF_LINE"; then
+  echo "error: expected GDB to reference main.c:$FIRST_PRINTF_LINE" >&2
   exit 1
 fi
 
-echo "==> OK — Zephyr native_sim debug session through rsgdb succeeded."
+if ! grep -qF 'RSGDB_E2E line 1' "$GDBSERVER_LOG"; then
+  echo "error: expected inferior log to contain RSGDB_E2E line 1 (after first next)" >&2
+  exit 1
+fi
+
+if ! grep -qF 'RSGDB_E2E line 2' "$GDBSERVER_LOG"; then
+  echo "error: expected inferior log to contain RSGDB_E2E line 2 (after second next)" >&2
+  exit 1
+fi
+
+echo "==> OK — Zephyr native_sim stepped printfs through rsgdb; log markers matched."

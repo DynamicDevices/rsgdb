@@ -69,6 +69,8 @@ To debug a **real Zephyr app** (still RSP/gdbserver) without QEMU or hardware, b
 
 Requires a full [Zephyr west workspace](https://docs.zephyrproject.org/latest/develop/getting_started/index.html) (`ZEPHYR_WORKSPACE` with `.west/` and `zephyr/`). See [native_sim](https://docs.zephyrproject.org/latest/boards/native/native_sim/doc/index.html). The script builds **`native_sim/native/64`** by default (LP64 host binary); the plain `native_sim` target is 32-bit and needs multilib on x86_64.
 
+The app under **`scripts/zephyr_multi_printf_app/`** (in this repo) has three `printf` lines with markers `RSGDB_E2E line 1` … `3`. The E2E script sets a breakpoint on the **first** `printf`, runs **`next`** twice, and asserts **`RSGDB_E2E line 1`** and **`line 2`** appear in the **gdbserver** log (inferior stdout). Override the app path with **`ZEPHYR_APP_SOURCE_DIR`** if needed.
+
 ```bash
 export ZEPHYR_WORKSPACE=/path/to/zephyrproject
 cargo build --release

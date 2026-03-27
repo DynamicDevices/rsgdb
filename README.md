@@ -216,7 +216,8 @@ rsgdb/
 ├── tests/                   # Integration tests
 ├── scripts/validate_local.sh
 ├── scripts/e2e_gdb_smoke.sh      # gdbserver → rsgdb → gdb (batch); CI E2E job
-├── scripts/e2e_zephyr_native_sim.sh  # optional: west build native_sim → same chain
+├── scripts/e2e_zephyr_native_sim.sh  # optional: west build native_sim + multi-printf stepping test
+├── scripts/zephyr_multi_printf_app/  # tiny Zephyr app for that script (west -s)
 ├── rsgdb.toml.example
 └── .github/workflows/
 ```
