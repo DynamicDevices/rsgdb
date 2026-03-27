@@ -44,7 +44,7 @@ From the repo root, run the same checks CI uses (fmt, tests with `--all-features
 ./scripts/validate_local.sh
 ```
 
-On Windows, use **Git Bash** or **WSL** so the script runs, or run the `cargo` commands from that script by hand.
+`cargo test` includes `tests/native_spawn_integration.rs`, which needs **`python3` or `python`** on `PATH` (CI runners provide this). On Windows, use **Git Bash** or **WSL** so the script runs, or run the `cargo` commands from that script by hand.
 
 ### Optional — dependency hygiene (before releases)
 
@@ -117,9 +117,9 @@ Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issue
 
 **Foundation (closed issues):** Part A (**#1–#3**), session recording (**#4**), SVD baseline (**#5**), breakpoint/semihosting spike (**#6**), flash (**#7**), RTOS decode/log (**#8**). **Phase A/B** in-tree: RSP matrix + proxy tests, gdbinit example, `rsgdb::rtos` decode logs — see README **Key Features**.
 
-**Current capabilities (same as README “Current”):** RSP codec + TCP proxy, `tracing` logging, TOML/env config, JSONL **record** + **`rsgdb replay`**, SVD register/field/enum-name memory annotations, `rsgdb flash`, RTOS packet summaries, CI + optional GDB/Zephyr E2E scripts.
+**Current capabilities (same as README “Current”):** RSP codec + TCP proxy, **managed native stub spawn** (`transport = native`, `[backend.spawn]` with `{port}`), `tracing` logging, TOML/env config, JSONL **record** + **`rsgdb replay`**, SVD register/field/enum-name memory annotations, `rsgdb flash`, RTOS packet summaries, CI + optional GDB/Zephyr E2E scripts.
 
-**Roadmap — open:** [#9](https://github.com/DynamicDevices/rsgdb/issues/9) native / non-TCP backend beyond `connect_tcp_backend`. **Optional follow-ups:** SVD value decode + recording correlation (see [#11](https://github.com/DynamicDevices/rsgdb/issues/11) history); TUI, logging export, proxy-side breakpoint management — open an issue before large changes.
+**Roadmap — follow-ups:** Deeper probe integration (beyond managed TCP spawn; CLI `backend_type` stays a label). **Optional:** SVD value decode + recording correlation (see [#11](https://github.com/DynamicDevices/rsgdb/issues/11) history); TUI, logging export, proxy-side breakpoint management — open an issue before large changes. [#9](https://github.com/DynamicDevices/rsgdb/issues/9) tracks native-spawn history; close with `Closes #9` when you consider it fully done from the project’s side.
 
 **CI:** Workflow **CI** + optional **Zephyr E2E** — green on `main` (see workflow files).
 
@@ -129,13 +129,19 @@ Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issue
 
 ### Remote board smoke (manual)
 
-Use this when a probe and target are available (optional OpenOCD or probe-rs GDB port):
+Use this when a probe and target are available.
 
-1. Start your **backend** (e.g. OpenOCD) and note its **GDB TCP port** (often `3333`).
+**Option A — stub already running (`transport = tcp`, default)**  
+1. Start your **backend** (e.g. OpenOCD) and note its **GDB TCP port** (often `3333`).  
 2. Start **rsgdb** so it listens for GDB and forwards to that port, e.g.  
-   `rsgdb --port 3334 --target-host 127.0.0.1 --target-port 3333`
-3. From GDB: `target extended-remote 127.0.0.1:3334`
+   `rsgdb --port 3334 --target-host 127.0.0.1 --target-port 3333`  
+3. From GDB: `target extended-remote 127.0.0.1:3334`  
 4. Confirm: **break** / **continue** / **step** / `info reg` (or `x/4xw` on a valid address).
+
+**Option B — rsgdb spawns the stub (`transport = native`)**  
+1. Put your OpenOCD (or other) argv in `[backend.spawn] program` with `{port}`; set `transport = "native"`.  
+2. Start **rsgdb** on your GDB listen port only (no separate stub step).  
+3. Connect GDB to rsgdb as usual.
 
 Success means the session behaves the same **with** rsgdb in the path as **without** (direct to OpenOCD), aside from added logging. Capture ports and commands in the issue if something fails.
 
@@ -198,35 +204,26 @@ when checking if a new hardware breakpoint could be added.
 
 3. **Write or update tests** for your changes
 
-4. **Run the test suite**:
+4. **Validate like CI** (preferred):
    ```bash
-   cargo test
+   ./scripts/validate_local.sh
    ```
+   Or run `cargo test`, `cargo fmt`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo doc` separately if you cannot run the script.
 
-5. **Run formatting**:
-   ```bash
-   cargo fmt
-   ```
+5. **Commit your changes** with clear, descriptive commit messages
 
-6. **Run linting**:
-   ```bash
-   cargo clippy -- -D warnings
-   ```
-
-7. **Commit your changes** with clear, descriptive commit messages
-
-8. **Push to your fork**:
+6. **Push to your fork**:
    ```bash
    git push origin feature/my-new-feature
    ```
 
-9. **Open a Pull Request** on GitHub with:
+7. **Open a Pull Request** on GitHub with:
    - Clear title and description
    - Reference to any related issues
    - Screenshots/examples if applicable
    - Test results
 
-10. **Address review feedback** promptly and professionally
+8. **Address review feedback** promptly and professionally
 
 ## Coding Standards
 
@@ -277,6 +274,7 @@ when checking if a new hardware breakpoint could be added.
 
 - Write unit tests for individual functions
 - Write integration tests for end-to-end scenarios
+- **`tests/native_spawn_integration.rs`** exercises `transport = native` against a Python TCP listener; CI and `./scripts/validate_local.sh` assume **Python** is on `PATH`
 - Use descriptive test names: `test_parse_packet_with_checksum`
 - Test both success and error cases
 - Aim for high code coverage

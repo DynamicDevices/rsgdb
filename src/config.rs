@@ -133,7 +133,7 @@ pub enum BackendTransport {
     #[default]
     #[serde(alias = "stub")]
     Tcp,
-    /// Direct probe / native integration (not implemented; reserved for #9).
+    /// rsgdb **spawns** a GDB stub (e.g. probe-rs, OpenOCD) with `{port}` in argv, then connects via TCP.
     Native,
 }
 
@@ -163,6 +163,46 @@ impl std::str::FromStr for BackendTransport {
     }
 }
 
+/// argv template for `transport = native`: must include `{port}` (ephemeral port rsgdb allocates).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackendSpawnConfig {
+    /// Stub command line; `{port}` is replaced once per GDB session.
+    #[serde(default)]
+    pub program: Vec<String>,
+    /// Address the stub must listen on (must match argv; default loopback).
+    #[serde(default = "default_spawn_bind_host")]
+    pub bind_host: String,
+    /// Max time to wait for the stub to accept TCP after spawn.
+    #[serde(default = "default_spawn_ready_timeout_secs")]
+    pub ready_timeout_secs: u64,
+    /// Delay between TCP connect attempts while waiting.
+    #[serde(default = "default_spawn_poll_ms")]
+    pub poll_interval_ms: u64,
+}
+
+fn default_spawn_bind_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_spawn_ready_timeout_secs() -> u64 {
+    30
+}
+
+fn default_spawn_poll_ms() -> u64 {
+    50
+}
+
+impl Default for BackendSpawnConfig {
+    fn default() -> Self {
+        Self {
+            program: Vec::new(),
+            bind_host: default_spawn_bind_host(),
+            ready_timeout_secs: default_spawn_ready_timeout_secs(),
+            poll_interval_ms: default_spawn_poll_ms(),
+        }
+    }
+}
+
 /// Backend configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackendConfig {
@@ -170,9 +210,13 @@ pub struct BackendConfig {
     #[serde(default = "default_backend_type")]
     pub backend_type: String,
 
-    /// Transport to the target (`tcp` = remote stub; `native` reserved).
+    /// Transport to the target (`tcp` = connect to existing stub; `native` = spawn stub then TCP).
     #[serde(default)]
     pub transport: BackendTransport,
+
+    /// Managed stub argv when `transport = native`.
+    #[serde(default)]
+    pub spawn: BackendSpawnConfig,
 
     /// Backend-specific options
     #[serde(default)]
@@ -278,6 +322,7 @@ impl Default for BackendConfig {
         Self {
             backend_type: default_backend_type(),
             transport: BackendTransport::default(),
+            spawn: BackendSpawnConfig::default(),
             options: std::collections::HashMap::new(),
         }
     }
@@ -375,6 +420,29 @@ impl Config {
                 field: "backend.backend_type".to_string(),
                 reason: "Cannot be empty".to_string(),
             });
+        }
+
+        if self.backend.transport == BackendTransport::Native {
+            if self.backend.spawn.program.is_empty() {
+                return Err(ConfigError::InvalidValue {
+                    field: "backend.spawn.program".to_string(),
+                    reason: "Required when transport = native; must include {port} placeholder"
+                        .to_string(),
+                });
+            }
+            let joined = self
+                .backend
+                .spawn
+                .program
+                .iter()
+                .fold(String::new(), |a, s| a + s);
+            if !joined.contains("{port}") {
+                return Err(ConfigError::InvalidValue {
+                    field: "backend.spawn.program".to_string(),
+                    reason: "Must contain the substring {port} for the ephemeral GDB stub port"
+                        .to_string(),
+                });
+            }
         }
 
         if self.recording.enabled && self.recording.output_dir.trim().is_empty() {
@@ -517,5 +585,29 @@ mod tests {
         let config = Config::from_toml_str(toml).unwrap();
         assert_eq!(config.proxy.listen_port, 4444);
         assert_eq!(config.logging.level, "debug");
+    }
+
+    #[test]
+    fn test_native_requires_spawn_program() {
+        let mut config = Config::default();
+        config.backend.transport = BackendTransport::Native;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_native_requires_port_placeholder() {
+        let mut config = Config::default();
+        config.backend.transport = BackendTransport::Native;
+        config.backend.spawn.program = vec!["true".into()];
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_native_spawn_validates_with_port_placeholder() {
+        let mut config = Config::default();
+        config.backend.transport = BackendTransport::Native;
+        config.backend.spawn.program =
+            vec!["sh".into(), "-c".into(), "exit 0".into(), "{port}".into()];
+        assert!(config.validate().is_ok());
     }
 }

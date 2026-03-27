@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Local CI parity check (Linux/macOS/Git Bash). Run from repository root.
 # Phase A RSP-only fast path: ./scripts/e2e_rsp_regression.sh (subset of what `cargo test` runs).
+# `cargo test` includes tests/native_spawn_integration.rs — requires python3 or python on PATH.
+# Optional: RUN_E2E_GDB=1 or RUN_E2E_ZEPHYR_NATIVE=1 — see CONTRIBUTING.md.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

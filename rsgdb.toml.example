@@ -52,8 +52,18 @@ enable_conditional = true
 [backend]
 # Label for logs / tooling (openocd, probe-rs, gdbserver, …)
 backend_type = "openocd"
-# How to reach the target: tcp = GDB stub on proxy.target_host:target_port; native = reserved (#9)
+# tcp vs native: see README section "Choosing tcp vs native"
+# tcp = connect to existing stub on proxy.target_host:target_port
+# native = spawn stub via [backend.spawn] with {port}, then TCP to bind_host:port
 transport = "tcp"
+
+# When transport = native: argv template; must contain {port} (ephemeral GDB port).
+# Stub must listen on bind_host at that port (match your tool’s CLI).
+# [backend.spawn]
+# program = ["probe-rs", "gdb", "--chip", "nrf52840", "--gdb-port", "{port}"]
+# bind_host = "127.0.0.1"
+# ready_timeout_secs = 30
+# poll_interval_ms = 50
 
 # Backend-specific options
 [backend.options]

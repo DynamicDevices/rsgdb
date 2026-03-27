@@ -4,6 +4,7 @@
 
 use crate::backends::connect_backend;
 use crate::backends::BackendStream;
+use crate::config::BackendTransport;
 use crate::config::{BackendConfig, ProxyConfig, RecordingConfig};
 use crate::error::RsgdbError;
 use crate::protocol::codec::{GdbCodec, PacketOrAck};
@@ -96,15 +97,30 @@ async fn handle_connection(
     let peer_addr = client_socket.peer_addr().map_err(RsgdbError::Io)?;
     info!("Handling connection from {}", peer_addr);
 
-    let backend_addr = format!("{}:{}", config.target_host, config.target_port);
+    let backend_desc = match backend_cfg.transport {
+        BackendTransport::Tcp => {
+            format!("{}:{}", config.target_host, config.target_port)
+        }
+        BackendTransport::Native => "(managed stub; see [backend.spawn])".to_string(),
+    };
     debug!(
-        "Connecting to backend at {} (transport={:?}, label={})",
-        backend_addr, backend_cfg.transport, backend_cfg.backend_type
+        "Connecting to backend {} (transport={:?}, label={})",
+        backend_desc, backend_cfg.transport, backend_cfg.backend_type
     );
 
-    let backend = connect_backend(&config, &backend_cfg).await?;
+    let conn = connect_backend(&config, &backend_cfg).await?;
 
-    info!("Connected to backend at {}", backend_addr);
+    match backend_cfg.transport {
+        BackendTransport::Tcp => {
+            info!("Connected to backend at {}", backend_desc);
+        }
+        BackendTransport::Native => {
+            info!(
+                "Connected to managed native stub (label={}, bind={})",
+                backend_cfg.backend_type, backend_cfg.spawn.bind_host
+            );
+        }
+    }
 
     let recorder = if recording.enabled {
         match SessionRecorder::create(&recording).await {
@@ -119,7 +135,14 @@ async fn handle_connection(
     };
 
     // Create a session to manage the connection
-    let mut session = ProxySession::new(client_socket, backend, config, recorder, svd);
+    let mut session = ProxySession::new(
+        client_socket,
+        conn.framed,
+        config,
+        recorder,
+        svd,
+        conn.spawned_child,
+    );
 
     // Run the session
     session.run().await?;
@@ -136,6 +159,8 @@ struct ProxySession {
     stats: Arc<Mutex<SessionStats>>,
     recorder: Option<SessionRecorder>,
     svd: Option<Arc<SvdIndex>>,
+    /// When `transport = native`, the stub process; killed when the GDB session ends.
+    spawned_child: Option<tokio::process::Child>,
 }
 
 /// Statistics for a proxy session (ack/nack counts are total forwarded in either direction)
@@ -157,6 +182,7 @@ impl ProxySession {
         config: ProxyConfig,
         recorder: Option<SessionRecorder>,
         svd: Option<Arc<SvdIndex>>,
+        spawned_child: Option<tokio::process::Child>,
     ) -> Self {
         let client = Framed::new(client_socket, GdbCodec::new());
 
@@ -167,6 +193,7 @@ impl ProxySession {
             stats: Arc::new(Mutex::new(SessionStats::default())),
             recorder,
             svd,
+            spawned_child,
         }
     }
 
@@ -182,6 +209,12 @@ impl ProxySession {
     async fn run(&mut self) -> Result<(), RsgdbError> {
         let res = self.run_inner().await;
         self.flush_recording().await;
+        if let Some(mut child) = self.spawned_child.take() {
+            if let Err(e) = child.kill().await {
+                warn!(error = %e, "failed to kill managed stub process");
+            }
+            let _ = child.wait().await;
+        }
         res
     }
 

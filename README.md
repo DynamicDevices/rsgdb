@@ -15,7 +15,7 @@ A Rust GDB **RSP proxy** with structured logging, optional CMSIS-SVD memory labe
 - **Advanced Breakpoint Management** (roadmap): Named breakpoints, conditional expressions, and hardware/software optimization — config and parsing exist; the proxy today **forwards** breakpoint RSP unchanged
 - **State Inspection** (partial today): Peripheral/register **labels** for memory traffic via CMSIS-SVD in logs; snapshots / deep state are not implemented yet
 - **Session Management**: JSONL **recording** and **`rsgdb replay`** mock-backend playback (see below)
-- **Backend Flexibility** (today): The proxy speaks **TCP** to whatever GDB stub you run (OpenOCD, probe-rs GDB port, `gdbserver`, …). `[backend].backend_type` / `--backend` is reserved for **future** native integration ([#9](https://github.com/DynamicDevices/rsgdb/issues/9)); it does not select a transport yet.
+- **Backend Flexibility** (today): **`transport = tcp`** connects to an existing stub on **`proxy.target_host`:`proxy.target_port`**. **`transport = native`** spawns a configured command (`[backend.spawn] program` with `{port}`), waits for TCP on `bind_host`, then uses the same RSP path; the child is killed when the GDB session ends ([#9](https://github.com/DynamicDevices/rsgdb/issues/9)). `[backend].backend_type` / `--backend` is a **label** for logs only.
 - **Modern Architecture**: Built with Rust for safety, performance, and reliability
 
 ## ✨ Key Features
@@ -29,6 +29,7 @@ A Rust GDB **RSP proxy** with structured logging, optional CMSIS-SVD memory labe
 - ▶️ **`rsgdb replay`** — load a recording and serve a **mock TCP backend** for one client (order-preserving playback / tests)
 - 📝 **SVD annotation (read-only)** — CMSIS-SVD → log labels for memory RSP (`m` / `M`): `Peripheral.REGISTER`, overlapping **fields**, and enumerated **variant names** where present (`target: rsgdb::svd`, debug)
 - ⚡ **`rsgdb flash`** — run a configured external flash tool (`[flash].program` with `{image}` substitution; OpenOCD/probe-rs/etc.)
+- 🔌 **`transport = native`** — spawn a GDB stub per session (`[backend.spawn] program` with `{port}`); TCP to loopback; teardown on disconnect
 - 🧵 **RTOS RSP decode / log (Zephyr-first)** — thread-extension packets are decoded and logged at `target: rsgdb::rtos` (debug). Thread *data* comes from your stub (e.g. OpenOCD **Zephyr** RTOS awareness); other RTOSes use the same GDB RSP when the stub implements them (see below).
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), `scripts/e2e_gdb_smoke.sh` (Ubuntu job in **CI** workflow). **Zephyr `native_sim`** E2E (`scripts/e2e_zephyr_native_sim.sh`) runs in the **Zephyr E2E** workflow when those scripts/app change, on `main`/`develop`, weekly, or manually. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - ✅ **Phase A (trust path)** — RSP codec matrix tests (`tests/rsp_codec_matrix.rs`, `scripts/e2e_rsp_regression.sh`), proxy TCP integration tests (`tests/proxy_integration.rs`).
@@ -38,7 +39,7 @@ A Rust GDB **RSP proxy** with structured logging, optional CMSIS-SVD memory labe
 - 📊 Enhanced logging with filtering and export (JSON, CSV)
 - 🎯 Advanced breakpoint management wired into the proxy (today: config + RSP parse; not a full manager on the wire)
 - 🔍 State tracking and visualization (beyond SVD-annotated memory logs)
-- 🔌 Native / non-TCP backends and richer probe integration ([#9](https://github.com/DynamicDevices/rsgdb/issues/9); CLI `backend_type` is reserved)
+- 🔌 Deeper probe integration (beyond managed TCP spawn; CLI `backend_type` remains a label)
 - 🖥️ Terminal UI (TUI) for interactive debugging
 - 📝 SVD: decode register **values** to enum names on the wire, and **correlation** with session recordings ([#11](https://github.com/DynamicDevices/rsgdb/issues/11) follow-ups)
 
@@ -85,6 +86,13 @@ rsgdb is a **transparent TCP proxy**: GDB speaks RSP to rsgdb; rsgdb forwards th
 | **rsgdb** | `0.0.0.0:3333` → `target_host:target_port` | `target extended-remote host:3333` |
 | **GDB** | — | rsgdb listen port |
 
+**Choosing `tcp` vs `native`**
+
+| Use | When |
+|-----|------|
+| **`transport = tcp`** (default) | The stub is **already running** (you started OpenOCD, probe-rs gdb, gdbserver, …). rsgdb **dials** `proxy.target_host`:`proxy.target_port`. |
+| **`transport = native`** | You want rsgdb to **spawn** the stub per GDB session with `[backend.spawn] program` and `{port}`, then connect to `bind_host` at that port. Ignores `target_host` / `target_port` for the backend. Kills the stub when GDB disconnects. |
+
 **Config:** `[proxy] listen_port`, `target_host`, `target_port`. **`timeout_secs`** applies only to **establishing** the TCP connection to the backend, not to idle GDB sessions (no read timeout on open connections).
 
 **Common issues**
@@ -119,7 +127,7 @@ target_port = 3334
 [backend]
 # Label for logs (openocd, probe-rs, gdbserver, …)
 backend_type = "openocd"
-# tcp = GDB stub on target_host:target_port; native = reserved (see GitHub #9)
+# tcp = existing stub on target_host:target_port; native = spawn [backend.spawn] with {port}
 transport = "tcp"
 
 [logging]
@@ -140,6 +148,8 @@ max_size_mb = 100
 # Optional: path to CMSIS-SVD XML for memory access labels in logs
 path = "device.svd"
 ```
+
+**Managed stub (`transport = native`):** set `transport = "native"` and define `[backend.spawn]` with a `program` array that includes the literal `{port}`. rsgdb picks an ephemeral port, substitutes it into argv, spawns the process, and connects to `bind_host` (default `127.0.0.1`) at that port. **`proxy.target_host` / `target_port` are not used** for this path. When GDB disconnects, the stub process is killed. If the stub exits before TCP is ready, or a connect times out, error messages point at argv / `bind_host` / `ready_timeout_secs`, and **include a tail of stub stderr** when the process produced any. Use `RUST_LOG=debug` for resolved spawn argv (`spawning native GDB stub subprocess`) and **`RUST_LOG=rsgdb::stub_stderr=debug`** (or `debug` globally) for **line-by-line stub stderr** while the process runs. See `rsgdb.toml.example` for a commented template.
 
 ### SVD labels (read-only)
 
@@ -282,12 +292,10 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests (`cargo test`)
-5. Run formatting (`cargo fmt`)
-6. Run linting (`cargo clippy`)
-7. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-8. Push to the branch (`git push origin feature/amazing-feature`)
-9. Open a Pull Request
+4. From the repo root, run **`./scripts/validate_local.sh`** (matches CI: fmt, `cargo test --all-features`, clippy `-D warnings`, `cargo doc` with warnings denied). Optional: `RUN_E2E_GDB=1` or `RUN_E2E_ZEPHYR_NATIVE=1` if you have those tools installed (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+5. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ## 📋 Roadmap
 
@@ -296,7 +304,7 @@ Source of truth for ordering and scope: **[GitHub Issues](https://github.com/Dyn
 | Milestone (docs) | What it means | Issue |
 |------------------|---------------|-------|
 | **Foundation + proxy** | RSP codec, TCP proxy, config, logging, CI (incl. GDB + Zephyr E2E), session record (JSONL), SVD labels, flash orchestration, RTOS decode/log | Closed: [#1–#8](https://github.com/DynamicDevices/rsgdb/issues?q=is%3Aissue+is%3Aclosed) |
-| **Next: native backend** | Implement `BackendTransport::Native`; default `transport = "tcp"` → `connect_backend` (`src/backends/mod.rs`) | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (open) |
+| **Native spawn backend** | `BackendTransport::Native` + `[backend.spawn]` (`{port}`), managed `Child` lifecycle, stderr capture | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (implemented) |
 | **Replay** | `rsgdb replay` + mock TCP backend from `.jsonl` | [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (closed) |
 | **Richer SVD** | Overlapping fields + enum variant names in annotations; value decode / recording correlation follow-ups | [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (baseline closed; follow-ups optional) |
 
@@ -327,4 +335,4 @@ You may choose either license for your use.
 
 ---
 
-**Status**: 🚧 Early development — CI green on `main` (multi-OS tests, GDB smoke, Zephyr `native_sim` E2E). Not a substitute for a production-qualified probe stack until native backends and release hardening land; see issues above.
+**Status**: 🚧 Early development — CI green on `main` (multi-OS tests, GDB smoke, Zephyr `native_sim` E2E, native-spawn integration test with Python). Managed **native** stub spawn is in-tree; deeper probe integration and release hardening remain roadmap items; see issues above.
