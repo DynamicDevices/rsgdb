@@ -66,7 +66,8 @@ jobs:
         run: |
           python3 -m venv .venv-west
           ./.venv-west/bin/pip install -U pip
-          ./.venv-west/bin/pip install west
+          # pyelftools: required by Zephyr build scripts (gen_kobject_list.py imports elftools).
+          ./.venv-west/bin/pip install west pyelftools
           echo "${{ github.workspace }}/.venv-west/bin" >> "$GITHUB_PATH"
 
       - uses: dtolnay/rust-toolchain@stable
