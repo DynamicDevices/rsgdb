@@ -261,6 +261,7 @@ rsgdb/
 ├── src/                     # Library + CLI
 ├── tests/                   # Integration tests
 ├── scripts/validate_local.sh
+├── scripts/deps_check.sh         # optional: duplicate deps, cargo audit, cargo outdated
 ├── scripts/e2e_gdb_smoke.sh      # gdbserver → rsgdb → gdb (batch); CI E2E job
 ├── scripts/e2e_zephyr_native_sim.sh  # optional: west build native_sim + multi-printf stepping test
 ├── scripts/e2e_rsp_regression.sh     # fast: codec + proxy integration only (no gdb)

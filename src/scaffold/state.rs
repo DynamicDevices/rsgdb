@@ -1,9 +1,6 @@
-//! State module
+//! Target/session state — scaffold for future tracking.
 //!
-//! State tracking and inspection for debugging sessions.
-//!
-//! **Status — scaffold:** not wired into the proxy; placeholder enum for future session/target
-//! state. Safe to ignore unless you are extending this API.
+//! **Status:** Not wired into the proxy. Safe to ignore unless extending this API.
 
 /// Represents the target state
 #[derive(Debug, Clone, PartialEq)]

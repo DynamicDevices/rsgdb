@@ -1,9 +1,6 @@
-//! UI module
+//! UI — scaffold for future TUI / web frontends.
 //!
-//! User interface implementations (TUI, web).
-//!
-//! **Status — scaffold:** `UiConfig`-style placeholders only; no TUI/web server in the binary yet.
-//! Safe to ignore unless you are extending this API.
+//! **Status:** No TUI or web server in the binary. Safe to ignore unless extending this API.
 
 /// UI configuration
 #[derive(Debug, Clone)]
