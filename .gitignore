@@ -1,3 +1,6 @@
+# Example board test binary (built locally)
+examples/board_test_app/board_test_app
+
 # Rust
 /target/
 **/*.rs.bk

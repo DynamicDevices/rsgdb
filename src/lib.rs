@@ -43,7 +43,8 @@ pub use crate::backends::{connect_backend, BackendConnection, BackendStream};
 
 // Re-export commonly used types
 pub use config::{
-    BackendConfig, BackendSpawnConfig, BackendTransport, Config, FlashConfig, SvdConfig,
+    BackendConfig, BackendRemoteSshConfig, BackendSpawnConfig, BackendTransport, Config,
+    FlashConfig, SvdConfig,
 };
 pub use error::{Result, RsgdbError};
 pub use logging_setup::{init_from_logging_config, LoggingInitGuard};

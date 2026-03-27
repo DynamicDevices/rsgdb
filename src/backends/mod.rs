@@ -1,12 +1,13 @@
 //! Debug probe backends: how the proxy reaches the **target** GDB remote.
 //!
 //! - **[`BackendTransport`]** — `tcp` (default): connect to a GDB stub on `proxy.target_host` /
-//!   `proxy.target_port`. `native`: spawn a stub with `[backend.spawn] program` and `{port}`, then
-//!   TCP to `bind_host:port` ([#9](https://github.com/DynamicDevices/rsgdb/issues/9)).
+//!   `proxy.target_port`. `native`: spawn a local stub with `[backend.spawn]`. `remote_ssh`: run a
+//!   remote command (e.g. `gdbserver`) over SSH, then TCP to `proxy.target_host`:`proxy.target_port`.
 //! - **`backend_type`** in [`crate::config::BackendConfig`] is a **label** (openocd, probe-rs, …)
 //!   for logging and future tooling; it does not change the wire path today.
 
 mod native;
+mod remote_ssh;
 mod stream;
 mod tcp;
 
@@ -39,6 +40,13 @@ pub async fn connect_backend(
         }
         BackendTransport::Native => {
             let (framed, child) = native::connect_native_managed(&backend.spawn).await?;
+            Ok(BackendConnection {
+                framed,
+                spawned_child: Some(child),
+            })
+        }
+        BackendTransport::RemoteSsh => {
+            let (framed, child) = remote_ssh::connect_remote_ssh(proxy, backend).await?;
             Ok(BackendConnection {
                 framed,
                 spawned_child: Some(child),

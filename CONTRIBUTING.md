@@ -117,7 +117,9 @@ Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issue
 
 **Foundation (closed issues):** Part A (**#1–#3**), session recording (**#4**), SVD baseline (**#5**), breakpoint/semihosting spike (**#6**), flash (**#7**), RTOS decode/log (**#8**). **Phase A/B** in-tree: RSP matrix + proxy tests, gdbinit example, `rsgdb::rtos` decode logs — see README **Key Features**.
 
-**Current capabilities (same as README “Current”):** RSP codec + TCP proxy, **managed native stub spawn** (`transport = native`, `[backend.spawn]` with `{port}`), `tracing` logging, TOML/env config, JSONL **record** + **`rsgdb replay`**, SVD register/field/enum-name memory annotations, `rsgdb flash`, RTOS packet summaries, CI + optional GDB/Zephyr E2E scripts.
+**Current capabilities (same as README “Current”):** RSP codec + TCP proxy, **managed native stub spawn** (`transport = native`, `[backend.spawn]` with `{port}`), **SSH remote gdbserver** (`transport = remote_ssh`, `[backend.remote_ssh]`; optional **`upload_local`/`upload_remote`** → `scp` before `ssh`; local `ssh`/`scp` + optional `RSGDB_SSH_PASSWORD`/`sshpass`), `tracing` logging, TOML/env config, JSONL **record** + **`rsgdb replay`**, SVD register/field/enum-name memory annotations, `rsgdb flash`, RTOS packet summaries, CI + optional GDB/Zephyr E2E scripts.
+
+**Project aim — zero-touch remote debugging:** move toward **one configured flow** (target address, SSH user, credentials via key or env) that automates **upload → gdbserver → proxy** without ad-hoc copy steps; see README **Design principles**, **Project Goals**, and roadmap row **Zero-touch remote debug**.
 
 **Roadmap — follow-ups:** Deeper probe integration (beyond managed TCP spawn; CLI `backend_type` stays a label). **Optional:** SVD value decode + recording correlation (see [#11](https://github.com/DynamicDevices/rsgdb/issues/11) history); TUI, logging export, proxy-side breakpoint management — open an issue before large changes. [#9](https://github.com/DynamicDevices/rsgdb/issues/9) tracks native-spawn history; close with `Closes #9` when you consider it fully done from the project’s side.
 
@@ -130,6 +132,11 @@ Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issue
 ### Remote board smoke (manual)
 
 Use this when a probe and target are available.
+
+**Linux target over SSH (`transport = remote_ssh`) — setup first**
+
+1. **One-time:** install your SSH public key on the target so `ssh`/`scp` and rsgdb do not depend on interactive passwords. From the repo root: `./examples/board_test_app/install_ssh_key.sh` (override host/user/port as needed; see `examples/board_test_app/README.md`).
+2. Point your config at `[backend.remote_ssh]` + `[proxy]` and connect GDB through rsgdb as in the main README. Optional: `examples/board_test_app/debug_remote.sh` for an end-to-end smoke.
 
 **Option A — stub already running (`transport = tcp`, default)**  
 1. Start your **backend** (e.g. OpenOCD) and note its **GDB TCP port** (often `3333`).  

@@ -1,0 +1,24 @@
+# Test remote debug: run rsgdb from repo root:
+#   export RSGDB_SSH_PASSWORD=...   # if not using SSH keys
+#   ./target/release/rsgdb --config examples/board_test_app/rsgdb.remote.toml
+# Then: aarch64-linux-gnu-gdb -ex 'file examples/board_test_app/board_test_app' -ex 'target extended-remote 127.0.0.1:3333'
+
+[proxy]
+listen_port = 3333
+target_host = "192.168.2.139"
+target_port = 2345
+timeout_secs = 60
+
+[logging]
+level = "info"
+format = "text"
+
+[backend]
+backend_type = "gdbserver"
+transport = "remote_ssh"
+
+[backend.remote_ssh]
+user = "fio"
+upload_local = "examples/board_test_app/board_test_app"
+upload_remote = "/tmp/rsgdb_board_test_app"
+program = ["gdbserver", "0.0.0.0:{port}", "/tmp/rsgdb_board_test_app"]

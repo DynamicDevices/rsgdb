@@ -7,6 +7,18 @@
 
 A Rust GDB **RSP proxy** with structured logging, optional CMSIS-SVD memory labels, JSONL session recording/replay, RTOS packet decode logs, and external flash orchestration — with room to grow into richer breakpoints and UIs.
 
+## Design principles
+
+rsgdb exists to make **remote debugging practical for embedded developers**: boards on the bench, in the lab, or over the network, without unnecessary ceremony. **Automation** and **reliability** are first-class goals, not afterthoughts.
+
+| Principle | What it means in practice |
+|-----------|---------------------------|
+| **Ease** | Few steps from “target is reachable” to GDB inspecting your ELF; sensible defaults; documented flows (config + helper scripts) that match how teams actually work. |
+| **Automation** | One place to describe the target (address, transport, optional binary upload); **`remote_ssh`** with optional **`scp`** so you are not hand-copying builds; preflight checks (e.g. SSH key access) before a long attach fails halfway. |
+| **Reliability** | Fail **early** with **actionable** errors (auth, ports, firewall, stub not listening); predictable behavior and exit codes; logging you can use in the field; CI and local E2E smoke where we can prove the path. |
+
+These principles align with **zero-touch remote debugging** below and inform roadmap work (fewer manual steps, clearer credential UX, stronger health checks over time).
+
 ## 🎯 Project Goals
 
 **rsgdb** aims to bridge the gap between traditional GDB debugging and modern embedded development needs by providing:
@@ -15,7 +27,8 @@ A Rust GDB **RSP proxy** with structured logging, optional CMSIS-SVD memory labe
 - **Advanced Breakpoint Management** (roadmap): Named breakpoints, conditional expressions, and hardware/software optimization — config and parsing exist; the proxy today **forwards** breakpoint RSP unchanged
 - **State Inspection** (partial today): Peripheral/register **labels** for memory traffic via CMSIS-SVD in logs; snapshots / deep state are not implemented yet
 - **Session Management**: JSONL **recording** and **`rsgdb replay`** mock-backend playback (see below)
-- **Backend Flexibility** (today): **`transport = tcp`** connects to an existing stub on **`proxy.target_host`:`proxy.target_port`**. **`transport = native`** spawns a configured command (`[backend.spawn] program` with `{port}`), waits for TCP on `bind_host`, then uses the same RSP path; the child is killed when the GDB session ends ([#9](https://github.com/DynamicDevices/rsgdb/issues/9)). `[backend].backend_type` / `--backend` is a **label** for logs only.
+- **Backend Flexibility** (today): **`transport = tcp`** connects to an existing stub on **`proxy.target_host`:`proxy.target_port`**. **`transport = native`** spawns a configured command (`[backend.spawn] program` with `{port}`), waits for TCP on `bind_host`, then uses the same RSP path; the child is killed when the GDB session ends ([#9](https://github.com/DynamicDevices/rsgdb/issues/9)). **`transport = remote_ssh`** runs **`gdbserver` on the target** over SSH; optional **`upload_local` / `upload_remote`** runs **`scp`** first so you are not forced to copy binaries by hand. `[backend].backend_type` / `--backend` is a **label** for logs only.
+- **Zero-touch remote debugging** (direction / aim): Reduce manual steps for **Linux targets** (e.g. Yocto boards): one config with **target address**, **login** (SSH user), and **credential** (SSH key or `RSGDB_SSH_PASSWORD` + `sshpass`) should drive **upload → gdbserver → proxy → GDB** where possible; more automation and polish are expected over time — see **Design principles** above and roadmap below.
 - **Modern Architecture**: Built with Rust for safety, performance, and reliability
 
 ## ✨ Key Features
@@ -29,7 +42,8 @@ A Rust GDB **RSP proxy** with structured logging, optional CMSIS-SVD memory labe
 - ▶️ **`rsgdb replay`** — load a recording and serve a **mock TCP backend** for one client (order-preserving playback / tests)
 - 📝 **SVD annotation (read-only)** — CMSIS-SVD → log labels for memory RSP (`m` / `M`): `Peripheral.REGISTER`, overlapping **fields**, and enumerated **variant names** where present (`target: rsgdb::svd`, debug)
 - ⚡ **`rsgdb flash`** — run a configured external flash tool (`[flash].program` with `{image}` substitution; OpenOCD/probe-rs/etc.)
-- 🔌 **`transport = native`** — spawn a GDB stub per session (`[backend.spawn] program` with `{port}`); TCP to loopback; teardown on disconnect
+- 🔌 **`transport = native`** — spawn a GDB stub **on this machine** per session (`[backend.spawn]` + `{port}`); teardown on disconnect
+- 🖧 **`transport = remote_ssh`** — run **`gdbserver` on the target** via **`ssh user@host …`** (`[backend.remote_ssh]` + `{port}`); optional **`upload_local`/`upload_remote`** → **`scp`** first; TCP to `proxy.target_host`:`proxy.target_port`; optional `RSGDB_SSH_PASSWORD` + `sshpass`
 - 🧵 **RTOS RSP decode / log (Zephyr-first)** — thread-extension packets are decoded and logged at `target: rsgdb::rtos` (debug). Thread *data* comes from your stub (e.g. OpenOCD **Zephyr** RTOS awareness); other RTOSes use the same GDB RSP when the stub implements them (see below).
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), `scripts/e2e_gdb_smoke.sh` (Ubuntu job in **CI** workflow). **Zephyr `native_sim`** E2E (`scripts/e2e_zephyr_native_sim.sh`) runs in the **Zephyr E2E** workflow when those scripts/app change, on `main`/`develop`, weekly, or manually. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - ✅ **Phase A (trust path)** — RSP codec matrix tests (`tests/rsp_codec_matrix.rs`, `scripts/e2e_rsp_regression.sh`), proxy TCP integration tests (`tests/proxy_integration.rs`).
@@ -86,12 +100,25 @@ rsgdb is a **transparent TCP proxy**: GDB speaks RSP to rsgdb; rsgdb forwards th
 | **rsgdb** | `0.0.0.0:3333` → `target_host:target_port` | `target extended-remote host:3333` |
 | **GDB** | — | rsgdb listen port |
 
-**Choosing `tcp` vs `native`**
+**Choosing `tcp` vs `native` vs `remote_ssh`**
 
 | Use | When |
 |-----|------|
 | **`transport = tcp`** (default) | The stub is **already running** (you started OpenOCD, probe-rs gdb, gdbserver, …). rsgdb **dials** `proxy.target_host`:`proxy.target_port`. |
-| **`transport = native`** | You want rsgdb to **spawn** the stub per GDB session with `[backend.spawn] program` and `{port}`, then connect to `bind_host` at that port. Ignores `target_host` / `target_port` for the backend. Kills the stub when GDB disconnects. |
+| **`transport = native`** | You want rsgdb to **spawn** the stub **on this machine** per GDB session with `[backend.spawn] program` and `{port}`, then connect to `bind_host` at that port. Kills the stub when GDB disconnects. |
+| **`transport = remote_ssh`** | The stub runs **on a remote host** (e.g. Yocto board). Optional **`upload_local`** + **`upload_remote`** run **`scp`** first (same auth as SSH). Then rsgdb runs **`ssh user@host …`** with `[backend.remote_ssh] program` (must include `{port}` → `proxy.target_port`), then connects TCP to **`proxy.target_host`:`proxy.target_port`**. Kills the **local** `ssh` process when GDB disconnects (typically ends remote `gdbserver`). Requires **OpenSSH** `ssh`/`scp` on PATH; optional **`RSGDB_SSH_PASSWORD`** + **`sshpass`** for non-interactive password auth. |
+
+#### Setting up a Linux target for `remote_ssh` debugging
+
+Do this **once per host/user** so `ssh`, `scp`, and rsgdb agree on the same auth (no password prompts in normal use).
+
+1. **Install your SSH public key on the target (recommended)** — from the repository root, run [`examples/board_test_app/install_ssh_key.sh`](examples/board_test_app/install_ssh_key.sh). Defaults match the example [`examples/board_test_app/rsgdb.remote.toml`](examples/board_test_app/rsgdb.remote.toml) (`fio` @ `192.168.2.139`). Override with `SSH_HOST`, `SSH_USER`, `SSH_PORT`, or positional `host` / `user`:
+   ```bash
+   ./examples/board_test_app/install_ssh_key.sh
+   ```
+   If you must pass the account password non-interactively (e.g. first-time automation), set `RSGDB_SSH_PASSWORD` and install **`sshpass`**; the script uses the same variable as rsgdb.
+2. **Or use password auth** — omit keys and rely on interactive prompts, or set **`RSGDB_SSH_PASSWORD`** + **`sshpass`** for rsgdb/`scp` (see table above).
+3. **Verify** — `ssh -p <port> user@host` should succeed without a password after step 1. Then use your `[backend.remote_ssh]` + `[proxy]` config, or follow [`examples/board_test_app/README.md`](examples/board_test_app/README.md) for a full smoke (`debug_remote.sh`).
 
 **Config:** `[proxy] listen_port`, `target_host`, `target_port`. **`timeout_secs`** applies only to **establishing** the TCP connection to the backend, not to idle GDB sessions (no read timeout on open connections).
 
@@ -307,11 +334,13 @@ Source of truth for ordering and scope: **[GitHub Issues](https://github.com/Dyn
 | **Native spawn backend** | `BackendTransport::Native` + `[backend.spawn]` (`{port}`), managed `Child` lifecycle, stderr capture | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (implemented) |
 | **Replay** | `rsgdb replay` + mock TCP backend from `.jsonl` | [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (closed) |
 | **Richer SVD** | Overlapping fields + enum variant names in annotations; value decode / recording correlation follow-ups | [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (baseline closed; follow-ups optional) |
+| **Zero-touch remote debug** | Fewer manual steps: remote IP + SSH identity + optional `scp` upload + `remote_ssh` gdbserver orchestration; expand credential UX and workflows over time | Aim (see **Project Goals**) |
 
 Older versioned bullets (v0.2–v0.4) below are **aspirational**; issue titles supersede them.
 
 ### Aspirational (not scheduled per-issue yet)
 - Enhanced logging export (JSON/CSV), advanced breakpoints, TUI, performance work — see **Planned** under Key Features and open an issue when starting.
+- Deeper **zero-touch remote debugging** (beyond current `scp` + `remote_ssh`): e.g. integrated workflows, fewer external tools, clearer security story for secrets — track as project aim above.
 
 ## 📄 License
 

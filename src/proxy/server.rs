@@ -102,6 +102,7 @@ async fn handle_connection(
             format!("{}:{}", config.target_host, config.target_port)
         }
         BackendTransport::Native => "(managed stub; see [backend.spawn])".to_string(),
+        BackendTransport::RemoteSsh => "(SSH remote stub; see [backend.remote_ssh])".to_string(),
     };
     debug!(
         "Connecting to backend {} (transport={:?}, label={})",
@@ -118,6 +119,12 @@ async fn handle_connection(
             info!(
                 "Connected to managed native stub (label={}, bind={})",
                 backend_cfg.backend_type, backend_cfg.spawn.bind_host
+            );
+        }
+        BackendTransport::RemoteSsh => {
+            info!(
+                "Connected to remote stub via SSH (label={}, gdbserver {}:{})",
+                backend_cfg.backend_type, config.target_host, config.target_port
             );
         }
     }

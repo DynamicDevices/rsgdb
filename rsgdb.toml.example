@@ -52,9 +52,10 @@ enable_conditional = true
 [backend]
 # Label for logs / tooling (openocd, probe-rs, gdbserver, …)
 backend_type = "openocd"
-# tcp vs native: see README section "Choosing tcp vs native"
+# tcp / native / remote_ssh: see README "Choosing tcp vs native vs remote_ssh"
 # tcp = connect to existing stub on proxy.target_host:target_port
-# native = spawn stub via [backend.spawn] with {port}, then TCP to bind_host:port
+# native = spawn local stub via [backend.spawn] with {port}
+# remote_ssh = ssh user@host and run remote gdbserver; see [backend.remote_ssh]
 transport = "tcp"
 
 # When transport = native: argv template; must contain {port} (ephemeral GDB port).
@@ -64,6 +65,16 @@ transport = "tcp"
 # bind_host = "127.0.0.1"
 # ready_timeout_secs = 30
 # poll_interval_ms = 50
+
+# When transport = remote_ssh: `{port}` is replaced with proxy.target_port (gdbserver must bind).
+# host empty = use proxy.target_host for SSH. Password: env RSGDB_SSH_PASSWORD + sshpass on PATH.
+# [backend.remote_ssh]
+# user = "fio"
+# ssh_port = 22
+# identity_file = "/home/me/.ssh/id_ed25519"
+# upload_local = "examples/board_test_app/board_test_app"
+# upload_remote = "/tmp/board_test_app"
+# program = ["gdbserver", "0.0.0.0:{port}", "/tmp/board_test_app"]
 
 # Backend-specific options
 [backend.options]

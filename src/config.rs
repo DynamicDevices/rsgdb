@@ -135,21 +135,25 @@ pub enum BackendTransport {
     Tcp,
     /// rsgdb **spawns** a GDB stub (e.g. probe-rs, OpenOCD) with `{port}` in argv, then connects via TCP.
     Native,
+    /// SSH to `target_host` (or `[backend.remote_ssh] host`), run remote argv (e.g. `gdbserver`), then TCP to `proxy.target_host`:`proxy.target_port`.
+    #[serde(rename = "remote_ssh", alias = "ssh")]
+    RemoteSsh,
 }
 
 impl BackendTransport {
-    /// Parse from config strings (`tcp`, `stub`, `native`).
+    /// Parse from config strings (`tcp`, `stub`, `native`, `remote_ssh`, `ssh`).
     pub fn parse(s: &str) -> ConfigResult<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "tcp" | "stub" => Ok(Self::Tcp),
             "native" => Ok(Self::Native),
+            "remote_ssh" | "ssh" => Ok(Self::RemoteSsh),
             "" => Err(ConfigError::InvalidValue {
                 field: "backend.transport".to_string(),
                 reason: "Cannot be empty".to_string(),
             }),
             other => Err(ConfigError::InvalidValue {
                 field: "backend.transport".to_string(),
-                reason: format!("Must be tcp or native, got: {other}"),
+                reason: format!("Must be tcp, native, or remote_ssh, got: {other}"),
             }),
         }
     }
@@ -203,6 +207,57 @@ impl Default for BackendSpawnConfig {
     }
 }
 
+/// Remote argv for `transport = remote_ssh`: must include `{port}` (same as `proxy.target_port`).
+/// rsgdb runs `ssh user@host …` locally; typically `gdbserver 0.0.0.0:{port} /path/to/binary`.
+///
+/// **Upload:** if both [`Self::upload_local`] and [`Self::upload_remote`] are set, rsgdb runs
+/// `scp` before SSH (same credentials as SSH: keys or `RSGDB_SSH_PASSWORD` + `sshpass`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackendRemoteSshConfig {
+    /// SSH target host; if empty, use `proxy.target_host`.
+    #[serde(default)]
+    pub host: String,
+    #[serde(default)]
+    pub user: String,
+    #[serde(default = "default_remote_ssh_port")]
+    pub ssh_port: u16,
+    #[serde(default)]
+    pub identity_file: Option<String>,
+    /// Local file to copy to the target before starting gdbserver (e.g. unstripped ELF).
+    #[serde(default)]
+    pub upload_local: Option<String>,
+    /// Destination path on the target (`scp` target); must match the binary path in `program`.
+    #[serde(default)]
+    pub upload_remote: Option<String>,
+    /// Remote command line; `{port}` → `proxy.target_port`.
+    #[serde(default)]
+    pub program: Vec<String>,
+    #[serde(default = "default_spawn_ready_timeout_secs")]
+    pub ready_timeout_secs: u64,
+    #[serde(default = "default_spawn_poll_ms")]
+    pub poll_interval_ms: u64,
+}
+
+fn default_remote_ssh_port() -> u16 {
+    22
+}
+
+impl Default for BackendRemoteSshConfig {
+    fn default() -> Self {
+        Self {
+            host: String::new(),
+            user: String::new(),
+            ssh_port: default_remote_ssh_port(),
+            identity_file: None,
+            upload_local: None,
+            upload_remote: None,
+            program: Vec::new(),
+            ready_timeout_secs: default_spawn_ready_timeout_secs(),
+            poll_interval_ms: default_spawn_poll_ms(),
+        }
+    }
+}
+
 /// Backend configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackendConfig {
@@ -217,6 +272,10 @@ pub struct BackendConfig {
     /// Managed stub argv when `transport = native`.
     #[serde(default)]
     pub spawn: BackendSpawnConfig,
+
+    /// SSH + remote argv when `transport = remote_ssh`.
+    #[serde(default)]
+    pub remote_ssh: BackendRemoteSshConfig,
 
     /// Backend-specific options
     #[serde(default)]
@@ -323,6 +382,7 @@ impl Default for BackendConfig {
             backend_type: default_backend_type(),
             transport: BackendTransport::default(),
             spawn: BackendSpawnConfig::default(),
+            remote_ssh: BackendRemoteSshConfig::default(),
             options: std::collections::HashMap::new(),
         }
     }
@@ -442,6 +502,59 @@ impl Config {
                     reason: "Must contain the substring {port} for the ephemeral GDB stub port"
                         .to_string(),
                 });
+            }
+        }
+
+        if self.backend.transport == BackendTransport::RemoteSsh {
+            if self.backend.remote_ssh.user.trim().is_empty() {
+                return Err(ConfigError::InvalidValue {
+                    field: "backend.remote_ssh.user".to_string(),
+                    reason: "Required when transport = remote_ssh".to_string(),
+                });
+            }
+            if self.backend.remote_ssh.program.is_empty() {
+                return Err(ConfigError::InvalidValue {
+                    field: "backend.remote_ssh.program".to_string(),
+                    reason: "Required when transport = remote_ssh; must include {port} placeholder"
+                        .to_string(),
+                });
+            }
+            let joined = self
+                .backend
+                .remote_ssh
+                .program
+                .iter()
+                .fold(String::new(), |a, s| a + s);
+            if !joined.contains("{port}") {
+                return Err(ConfigError::InvalidValue {
+                    field: "backend.remote_ssh.program".to_string(),
+                    reason: "Must contain {port} (same as proxy.target_port) for gdbserver bind"
+                        .to_string(),
+                });
+            }
+
+            let ul = self
+                .backend
+                .remote_ssh
+                .upload_local
+                .as_ref()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty());
+            let ur = self
+                .backend
+                .remote_ssh
+                .upload_remote
+                .as_ref()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty());
+            match (ul, ur) {
+                (Some(_), None) | (None, Some(_)) => {
+                    return Err(ConfigError::InvalidValue {
+                        field: "backend.remote_ssh.upload".to_string(),
+                        reason: "Set both upload_local and upload_remote, or omit both".to_string(),
+                    });
+                }
+                _ => {}
             }
         }
 
@@ -609,5 +722,41 @@ mod tests {
         config.backend.spawn.program =
             vec!["sh".into(), "-c".into(), "exit 0".into(), "{port}".into()];
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_remote_ssh_requires_user() {
+        let mut config = Config::default();
+        config.backend.transport = BackendTransport::RemoteSsh;
+        config.backend.remote_ssh.program = vec![
+            "gdbserver".into(),
+            "0.0.0.0:{port}".into(),
+            "/bin/true".into(),
+        ];
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_remote_ssh_validates_with_user_and_port_placeholder() {
+        let mut config = Config::default();
+        config.backend.transport = BackendTransport::RemoteSsh;
+        config.backend.remote_ssh.user = "root".into();
+        config.backend.remote_ssh.program = vec![
+            "gdbserver".into(),
+            "0.0.0.0:{port}".into(),
+            "/bin/true".into(),
+        ];
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_remote_ssh_upload_requires_both_paths() {
+        let mut config = Config::default();
+        config.backend.transport = BackendTransport::RemoteSsh;
+        config.backend.remote_ssh.user = "u".into();
+        config.backend.remote_ssh.program =
+            vec!["gdbserver".into(), "0.0.0.0:{port}".into(), "/x".into()];
+        config.backend.remote_ssh.upload_local = Some("/a".into());
+        assert!(config.validate().is_err());
     }
 }

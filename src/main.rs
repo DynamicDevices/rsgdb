@@ -93,8 +93,8 @@ struct ProxyArgs {
     #[arg(long, value_name = "FILE")]
     svd: Option<PathBuf>,
 
-    /// Backend transport: `tcp` (existing stub on target_host:target_port) or `native` (`[backend.spawn]`)
-    #[arg(long, value_name = "tcp|native")]
+    /// Backend transport: `tcp`, `native` (`[backend.spawn]`), or `remote_ssh` (`[backend.remote_ssh]`)
+    #[arg(long, value_name = "tcp|native|remote_ssh")]
     transport: Option<String>,
 }
 

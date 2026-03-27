@@ -51,7 +51,7 @@ fn utf8_tail(s: &str, max_bytes: usize) -> &str {
     &s[start..]
 }
 
-fn enrich_err_with_stderr(err: RsgdbError, stderr: &str) -> RsgdbError {
+pub(crate) fn enrich_err_with_stderr(err: RsgdbError, stderr: &str) -> RsgdbError {
     let stderr = stderr.trim();
     if stderr.is_empty() {
         return err;
@@ -68,12 +68,12 @@ fn enrich_err_with_stderr(err: RsgdbError, stderr: &str) -> RsgdbError {
     }
 }
 
-async fn snapshot_stderr_capture(capture: &Arc<Mutex<String>>) -> String {
+pub(crate) async fn snapshot_stderr_capture(capture: &Arc<Mutex<String>>) -> String {
     tokio::time::sleep(Duration::from_millis(100)).await;
     capture.lock().await.clone()
 }
 
-async fn drain_stub_stderr(stderr: ChildStderr, capture: Arc<Mutex<String>>) {
+pub(crate) async fn drain_stub_stderr(stderr: ChildStderr, capture: Arc<Mutex<String>>) {
     let mut reader = BufReader::new(stderr);
     let mut line = String::new();
     loop {
