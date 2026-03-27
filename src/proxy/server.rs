@@ -14,11 +14,21 @@ use crate::rtos;
 use crate::svd::SvdIndex;
 use futures::StreamExt;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 use tokio_util::codec::Framed;
 use tracing::{debug, error, info, warn};
+
+/// Clears `remote_ssh_busy` when dropped so a second GDB client can connect after the session ends.
+struct RemoteSshSessionSlot(Arc<AtomicBool>);
+
+impl Drop for RemoteSshSessionSlot {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
 
 /// Proxy server that bridges GDB clients and debug backends
 pub struct ProxyServer {
@@ -27,6 +37,8 @@ pub struct ProxyServer {
     recording: RecordingConfig,
     svd: Option<Arc<SvdIndex>>,
     listener: TcpListener,
+    /// When `transport = remote_ssh`, only one GDB client may use the proxy at a time (one scp/ssh/gdbserver chain).
+    remote_ssh_busy: Option<Arc<AtomicBool>>,
 }
 
 impl ProxyServer {
@@ -44,12 +56,19 @@ impl ProxyServer {
 
         info!("Proxy server listening on {}", addr);
 
+        let remote_ssh_busy = if backend.transport == BackendTransport::RemoteSsh {
+            Some(Arc::new(AtomicBool::new(false)))
+        } else {
+            None
+        };
+
         Ok(Self {
             config,
             backend,
             recording,
             svd,
             listener,
+            remote_ssh_busy,
         })
     }
 
@@ -69,14 +88,38 @@ impl ProxyServer {
                     let recording = self.recording.clone();
                     let svd = self.svd.clone();
 
-                    // Spawn a new task to handle this connection
-                    tokio::spawn(async move {
-                        if let Err(e) =
-                            handle_connection(socket, config, backend, recording, svd).await
+                    if let Some(ref busy) = self.remote_ssh_busy {
+                        match busy.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
                         {
-                            error!("Connection error: {}", e);
+                            Ok(_) => {
+                                let slot = RemoteSshSessionSlot(Arc::clone(busy));
+                                tokio::spawn(async move {
+                                    let _slot = slot;
+                                    if let Err(e) =
+                                        handle_connection(socket, config, backend, recording, svd)
+                                            .await
+                                    {
+                                        error!("Connection error: {}", e);
+                                    }
+                                });
+                            }
+                            Err(_) => {
+                                warn!(
+                                    peer = %addr,
+                                    "rejecting GDB client: transport=remote_ssh already has an active session (IDEs may open two TCP connections; only one is allowed)"
+                                );
+                                drop(socket);
+                            }
                         }
-                    });
+                    } else {
+                        tokio::spawn(async move {
+                            if let Err(e) =
+                                handle_connection(socket, config, backend, recording, svd).await
+                            {
+                                error!("Connection error: {}", e);
+                            }
+                        });
+                    }
                 }
                 Err(e) => {
                     error!("Failed to accept connection: {}", e);

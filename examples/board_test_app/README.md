@@ -123,6 +123,8 @@ Use the **repository root** as the workspace folder so `${workspaceFolder}` reso
 **`Connection reset by peer` / `Unexpected GDB output` on `-target-select`:**  
 The first debug session runs **`scp` + `ssh` + `gdbserver`** on the board; that can take **tens of seconds**. GDB’s default **remote timeout** is short, so it may close the connection before rsgdb finishes. [`.vscode/launch.json`](../../.vscode/launch.json) sets **`miDebuggerArgs`** to **`set remotetimeout 120`**, and [`rsgdb.remote.toml`](rsgdb.remote.toml) raises **`ready_timeout_secs`**. If it still fails, confirm the board is reachable (**`ping`**, **`ssh user@host`**, **`scp`**), read **`/tmp/rsgdb-cursor-3333.log`**, and run **`RUST_LOG=info ./target/release/rsgdb --config …`** in a terminal to see rsgdb errors (failed **scp**/SSH/TCP to gdbserver closes the proxy side and shows up as reset in the IDE).
 
+Some IDEs open **two TCP connections** to the proxy; **`transport = remote_ssh`** must only run **one** scp/ssh/gdbserver chain. Current **rsgdb** rejects a second client while a session is active (see log: `rejecting GDB client: transport=remote_ssh already has an active session`).
+
 ### Manual gdbserver on target
 
 On the **target**:
