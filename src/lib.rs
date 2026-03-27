@@ -22,6 +22,8 @@
 //! # }
 //! ```
 
+pub mod config;
+pub mod error;
 pub mod proxy;
 pub mod protocol;
 pub mod breakpoints;
@@ -31,8 +33,9 @@ pub mod backends;
 pub mod recorder;
 pub mod ui;
 
-/// Result type alias using anyhow::Error
-pub type Result<T> = anyhow::Result<T>;
+// Re-export commonly used types
+pub use config::Config;
+pub use error::{RsgdbError, Result};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

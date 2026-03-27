@@ -1,0 +1,73 @@
+# rsgdb Configuration File Example
+# Copy this file to rsgdb.toml and customize as needed
+
+[proxy]
+# Port to listen on for GDB connections
+listen_port = 3333
+
+# Target host to connect to (debug probe backend)
+target_host = "localhost"
+
+# Target port to connect to
+target_port = 3334
+
+# Enable packet acknowledgments
+enable_acks = true
+
+# Connection timeout in seconds
+timeout_secs = 30
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+
+# Log format: text, json
+format = "text"
+
+# Output file path (omit for stdout)
+# output = "rsgdb.log"
+
+# Log all protocol traffic
+log_protocol = true
+
+# Include timestamps in logs
+include_timestamps = true
+
+# Include thread IDs in logs
+include_thread_ids = false
+
+[breakpoints]
+# Automatically optimize hardware/software breakpoint usage
+auto_optimize = true
+
+# Maximum number of hardware breakpoints supported by target
+max_hardware = 6
+
+# Enable named breakpoints
+enable_named = true
+
+# Enable conditional breakpoints
+enable_conditional = true
+
+[backend]
+# Backend type: openocd, probe-rs, pyocd
+backend_type = "openocd"
+
+# Backend-specific options
+[backend.options]
+# Example OpenOCD options:
+# interface = "stlink"
+# target = "stm32f4x"
+
+[recording]
+# Enable session recording
+enabled = false
+
+# Output directory for recordings
+output_dir = "./recordings"
+
+# Maximum recording size in MB
+max_size_mb = 100
+
+# Compress recordings
+compress = true

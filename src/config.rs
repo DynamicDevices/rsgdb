@@ -1,0 +1,387 @@
+//! Configuration management for rsgdb
+
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+use std::fs;
+
+use crate::error::{ConfigError, ConfigResult};
+
+/// Main configuration structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    /// Proxy configuration
+    #[serde(default)]
+    pub proxy: ProxyConfig,
+    
+    /// Logging configuration
+    #[serde(default)]
+    pub logging: LoggingConfig,
+    
+    /// Breakpoint configuration
+    #[serde(default)]
+    pub breakpoints: BreakpointConfig,
+    
+    /// Backend configuration
+    #[serde(default)]
+    pub backend: BackendConfig,
+    
+    /// Session recording configuration
+    #[serde(default)]
+    pub recording: RecordingConfig,
+}
+
+/// Proxy server configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProxyConfig {
+    /// Port to listen on for GDB connections
+    #[serde(default = "default_listen_port")]
+    pub listen_port: u16,
+    
+    /// Target host to connect to
+    #[serde(default = "default_target_host")]
+    pub target_host: String,
+    
+    /// Target port to connect to
+    #[serde(default = "default_target_port")]
+    pub target_port: u16,
+    
+    /// Enable packet acknowledgments
+    #[serde(default = "default_true")]
+    pub enable_acks: bool,
+    
+    /// Connection timeout in seconds
+    #[serde(default = "default_timeout")]
+    pub timeout_secs: u64,
+}
+
+/// Logging configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoggingConfig {
+    /// Log level (trace, debug, info, warn, error)
+    #[serde(default = "default_log_level")]
+    pub level: String,
+    
+    /// Log format (text, json)
+    #[serde(default = "default_log_format")]
+    pub format: String,
+    
+    /// Output file path (None for stdout)
+    pub output: Option<String>,
+    
+    /// Log all protocol traffic
+    #[serde(default = "default_true")]
+    pub log_protocol: bool,
+    
+    /// Include timestamps
+    #[serde(default = "default_true")]
+    pub include_timestamps: bool,
+    
+    /// Include thread IDs
+    #[serde(default = "default_false")]
+    pub include_thread_ids: bool,
+}
+
+/// Breakpoint management configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BreakpointConfig {
+    /// Automatically optimize hardware/software breakpoint usage
+    #[serde(default = "default_true")]
+    pub auto_optimize: bool,
+    
+    /// Maximum number of hardware breakpoints
+    #[serde(default = "default_max_hardware_breakpoints")]
+    pub max_hardware: u32,
+    
+    /// Enable named breakpoints
+    #[serde(default = "default_true")]
+    pub enable_named: bool,
+    
+    /// Enable conditional breakpoints
+    #[serde(default = "default_true")]
+    pub enable_conditional: bool,
+}
+
+/// Backend configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackendConfig {
+    /// Backend type (openocd, probe-rs, pyocd)
+    #[serde(default = "default_backend_type")]
+    pub backend_type: String,
+    
+    /// Backend-specific options
+    #[serde(default)]
+    pub options: std::collections::HashMap<String, String>,
+}
+
+/// Session recording configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordingConfig {
+    /// Enable session recording
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    
+    /// Output directory for recordings
+    #[serde(default = "default_recording_dir")]
+    pub output_dir: String,
+    
+    /// Maximum recording size in MB
+    #[serde(default = "default_max_recording_size")]
+    pub max_size_mb: u64,
+    
+    /// Compress recordings
+    #[serde(default = "default_true")]
+    pub compress: bool,
+}
+
+// Default value functions
+fn default_listen_port() -> u16 { 3333 }
+fn default_target_host() -> String { "localhost".to_string() }
+fn default_target_port() -> u16 { 3334 }
+fn default_timeout() -> u64 { 30 }
+fn default_log_level() -> String { "info".to_string() }
+fn default_log_format() -> String { "text".to_string() }
+fn default_max_hardware_breakpoints() -> u32 { 6 }
+fn default_backend_type() -> String { "openocd".to_string() }
+fn default_recording_dir() -> String { "./recordings".to_string() }
+fn default_max_recording_size() -> u64 { 100 }
+fn default_true() -> bool { true }
+fn default_false() -> bool { false }
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            proxy: ProxyConfig::default(),
+            logging: LoggingConfig::default(),
+            breakpoints: BreakpointConfig::default(),
+            backend: BackendConfig::default(),
+            recording: RecordingConfig::default(),
+        }
+    }
+}
+
+impl Default for ProxyConfig {
+    fn default() -> Self {
+        Self {
+            listen_port: default_listen_port(),
+            target_host: default_target_host(),
+            target_port: default_target_port(),
+            enable_acks: default_true(),
+            timeout_secs: default_timeout(),
+        }
+    }
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            level: default_log_level(),
+            format: default_log_format(),
+            output: None,
+            log_protocol: default_true(),
+            include_timestamps: default_true(),
+            include_thread_ids: default_false(),
+        }
+    }
+}
+
+impl Default for BreakpointConfig {
+    fn default() -> Self {
+        Self {
+            auto_optimize: default_true(),
+            max_hardware: default_max_hardware_breakpoints(),
+            enable_named: default_true(),
+            enable_conditional: default_true(),
+        }
+    }
+}
+
+impl Default for BackendConfig {
+    fn default() -> Self {
+        Self {
+            backend_type: default_backend_type(),
+            options: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl Default for RecordingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_false(),
+            output_dir: default_recording_dir(),
+            max_size_mb: default_max_recording_size(),
+            compress: default_true(),
+        }
+    }
+}
+
+impl Config {
+    /// Load configuration from a TOML file
+    pub fn from_file<P: AsRef<Path>>(path: P) -> ConfigResult<Self> {
+        let path = path.as_ref();
+        
+        if !path.exists() {
+            return Err(ConfigError::FileNotFound(path.display().to_string()));
+        }
+        
+        let contents = fs::read_to_string(path)
+            .map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        
+        let config: Config = toml::from_str(&contents)
+            .map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        
+        config.validate()?;
+        
+        Ok(config)
+    }
+    
+    /// Load configuration from a TOML string
+    pub fn from_str(s: &str) -> ConfigResult<Self> {
+        let config: Config = toml::from_str(s)
+            .map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        
+        config.validate()?;
+        
+        Ok(config)
+    }
+    
+    /// Save configuration to a TOML file
+    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> ConfigResult<()> {
+        let contents = toml::to_string_pretty(self)
+            .map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        
+        fs::write(path, contents)
+            .map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        
+        Ok(())
+    }
+    
+    /// Validate the configuration
+    pub fn validate(&self) -> ConfigResult<()> {
+        // Validate proxy config
+        if self.proxy.listen_port == 0 {
+            return Err(ConfigError::InvalidValue {
+                field: "proxy.listen_port".to_string(),
+                reason: "Port cannot be 0".to_string(),
+            });
+        }
+        
+        if self.proxy.target_port == 0 {
+            return Err(ConfigError::InvalidValue {
+                field: "proxy.target_port".to_string(),
+                reason: "Port cannot be 0".to_string(),
+            });
+        }
+        
+        if self.proxy.target_host.is_empty() {
+            return Err(ConfigError::InvalidValue {
+                field: "proxy.target_host".to_string(),
+                reason: "Host cannot be empty".to_string(),
+            });
+        }
+        
+        // Validate logging config
+        let valid_levels = ["trace", "debug", "info", "warn", "error"];
+        if !valid_levels.contains(&self.logging.level.as_str()) {
+            return Err(ConfigError::InvalidValue {
+                field: "logging.level".to_string(),
+                reason: format!("Must be one of: {}", valid_levels.join(", ")),
+            });
+        }
+        
+        let valid_formats = ["text", "json"];
+        if !valid_formats.contains(&self.logging.format.as_str()) {
+            return Err(ConfigError::InvalidValue {
+                field: "logging.format".to_string(),
+                reason: format!("Must be one of: {}", valid_formats.join(", ")),
+            });
+        }
+        
+        // Validate backend config
+        let valid_backends = ["openocd", "probe-rs", "pyocd"];
+        if !valid_backends.contains(&self.backend.backend_type.as_str()) {
+            return Err(ConfigError::InvalidValue {
+                field: "backend.backend_type".to_string(),
+                reason: format!("Must be one of: {}", valid_backends.join(", ")),
+            });
+        }
+        
+        Ok(())
+    }
+    
+    /// Merge with environment variables
+    pub fn merge_env(&mut self) {
+        if let Ok(port) = std::env::var("RSGDB_PORT") {
+            if let Ok(port) = port.parse() {
+                self.proxy.listen_port = port;
+            }
+        }
+        
+        if let Ok(host) = std::env::var("RSGDB_TARGET_HOST") {
+            self.proxy.target_host = host;
+        }
+        
+        if let Ok(port) = std::env::var("RSGDB_TARGET_PORT") {
+            if let Ok(port) = port.parse() {
+                self.proxy.target_port = port;
+            }
+        }
+        
+        if let Ok(level) = std::env::var("RSGDB_LOG_LEVEL") {
+            self.logging.level = level;
+        }
+        
+        if let Ok(backend) = std::env::var("RSGDB_BACKEND") {
+            self.backend.backend_type = backend;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let config = Config::default();
+        assert_eq!(config.proxy.listen_port, 3333);
+        assert_eq!(config.logging.level, "info");
+    }
+
+    #[test]
+    fn test_config_validation() {
+        let config = Config::default();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_port() {
+        let mut config = Config::default();
+        config.proxy.listen_port = 0;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_invalid_log_level() {
+        let mut config = Config::default();
+        config.logging.level = "invalid".to_string();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_config_from_str() {
+        let toml = r#"
+            [proxy]
+            listen_port = 4444
+            
+            [logging]
+            level = "debug"
+        "#;
+        
+        let config = Config::from_str(toml).unwrap();
+        assert_eq!(config.proxy.listen_port, 4444);
+        assert_eq!(config.logging.level, "debug");
+    }
+}
+
+// Made with Bob

@@ -2,7 +2,13 @@
 //!
 //! GDB Remote Serial Protocol (RSP) implementation.
 
+pub mod commands;
+pub mod codec;
+
 use thiserror::Error;
+
+pub use commands::{GdbCommand, QueryCommand, BreakpointType, CommandError};
+pub use codec::{GdbCodec, PacketOrAck};
 
 /// Protocol errors
 #[derive(Error, Debug)]
