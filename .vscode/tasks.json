@@ -25,11 +25,7 @@
     {
       "label": "rsgdb: remote_ssh proxy",
       "type": "shell",
-      "command": "\"${workspaceFolder}/target/release/rsgdb\"",
-      "args": [
-        "--config",
-        "${workspaceFolder}/examples/board_test_app/rsgdb.remote.toml"
-      ],
+      "command": "\"${workspaceFolder}/examples/board_test_app/run_rsgdb_proxy.sh\"",
       "options": {
         "cwd": "${workspaceFolder}"
       },

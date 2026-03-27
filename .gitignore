@@ -1,5 +1,7 @@
 # Example board test binary (built locally)
 examples/board_test_app/board_test_app
+# Optional env overrides for Cursor/tasks (copy from rsgdb.env.example)
+examples/board_test_app/rsgdb.env
 
 # Rust
 /target/

@@ -16,6 +16,47 @@ Before debugging with **`transport = remote_ssh`** (so `scp` + `ssh` work withou
 2. Confirm **`ssh`** to the target works without a password.
 3. Continue with **Build** and **Debug** below. See the main README **Setting up a Linux target for `remote_ssh` debugging** for the full project-wide checklist.
 
+## Configure target IP, deploy, and debug
+
+**Remote deploy + debug** is driven by [`rsgdb.remote.toml`](rsgdb.remote.toml): **`rsgdb`** **`scp`**s your built ELF to the board, **`ssh`** starts **`gdbserver`** there, then **GDB** (CLI or Cursor) talks to **`127.0.0.1:<listen_port>`** on your PC while the proxy forwards to the board.
+
+### 1. Point at your board (IP, user, ports)
+
+Edit **`examples/board_test_app/rsgdb.remote.toml`** (paths are relative to the **repo root** when you run **`rsgdb`** from there):
+
+| Setting | Meaning |
+|--------|--------|
+| **`[proxy] target_host`** | Board **IP or hostname** (SSH and TCP target when **`[backend.remote_ssh] host`** is unset). |
+| **`[proxy] target_port`** | Port **`gdbserver`** listens on **on the board** (must match **`{port}`** in **`program`**). |
+| **`[proxy] listen_port`** | Port **on your PC** where **GDB** attaches (**`127.0.0.1:this`**). Default **3333** — if you change it, update [`.vscode/launch.json`](../../.vscode/launch.json) **`miDebuggerServerAddress`**. |
+| **`[backend.remote_ssh] user`** | SSH login on the target. |
+| **`upload_local` / `upload_remote`** | Host path → path on the board for **`scp`** before **`gdbserver`**. |
+| **`program`** | Remote command; must include **`{port}`** (same value as **`target_port`**). |
+
+**Override IP/port without committing edits to the TOML** (applied after the file is loaded): create **`examples/board_test_app/rsgdb.env`** from [`rsgdb.env.example`](rsgdb.env.example) (that file is **gitignored**). Set **`RSGDB_TARGET_HOST`**, optional **`RSGDB_TARGET_PORT`**, **`RSGDB_PORT`**, or **`RSGDB_SSH_PASSWORD`**. Cursor’s preLaunch task runs [`run_rsgdb_proxy.sh`](run_rsgdb_proxy.sh), which **`source`**s **`rsgdb.env`** if present, then starts **`rsgdb`**.
+
+```bash
+cp examples/board_test_app/rsgdb.env.example examples/board_test_app/rsgdb.env
+# edit IP / password in rsgdb.env
+```
+
+### 2. Start debugging from Cursor
+
+1. **`make`** / build **`board_test_app`** (the preLaunch task does this).
+2. Run **`rsgdb: board_test_app (build, start proxy, debug)`** — it starts **`rsgdb`** with this TOML, which **deploys** the binary and **starts gdbserver** on the target, then attaches **gdb-multiarch** to **localhost:3333** (or whatever **`listen_port`** / **`RSGDB_PORT`** you use).
+
+If **`rsgdb`** is already running in a terminal with the right env/config, use **`rsgdb: board_test_app (proxy already running)`** instead.
+
+### 3. Same flow on the CLI
+
+```bash
+cd /path/to/rsgdb
+./examples/board_test_app/run_rsgdb_proxy.sh
+# or: export RSGDB_TARGET_HOST=… && ./target/release/rsgdb --config examples/board_test_app/rsgdb.remote.toml
+```
+
+In another terminal: **`gdb-multiarch`** → **`target extended-remote 127.0.0.1:3333`** with **`file`** set to the ELF (see **Automated** debug section below).
+
 ## Build (aarch64 default)
 
 The Makefile defaults to **`aarch64-linux-gnu-gcc`**:

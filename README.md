@@ -309,7 +309,7 @@ rsgdb/
 ├── src/                     # Library + CLI
 ├── tests/                   # Integration tests
 ├── .vscode/                 # shared VS Code / Cursor: launch + tasks (board_test_app remote debug)
-├── examples/board_test_app/ # remote Linux target smoke (Makefile, rsgdb.remote.toml, helper scripts)
+├── examples/board_test_app/ # remote Linux target smoke (Makefile, rsgdb.remote.toml, rsgdb.env.example, run_rsgdb_proxy.sh)
 ├── CHANGELOG.md
 ├── RELEASING.md
 ├── scripts/validate_local.sh
