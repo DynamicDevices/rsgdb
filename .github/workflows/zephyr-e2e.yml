@@ -40,6 +40,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Runners are ~14GB; Zephyr west tree + SDK + release+LTO can exhaust disk.
+      - name: Free disk space (remove unused CI images)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /usr/local/share/boost
+          df -h
+
       - name: Install host packages (Zephyr host + gdb stack)
         run: |
           sudo apt-get update
@@ -64,6 +70,12 @@ jobs:
           echo "${{ github.workspace }}/.venv-west/bin" >> "$GITHUB_PATH"
 
       - uses: dtolnay/rust-toolchain@stable
+
+      # Debug build only: release profile uses LTO + huge rmeta intermediates and fills the disk.
+      - name: Build rsgdb (debug)
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: cargo build --verbose
 
       - name: Cache Zephyr SDK
         id: zephyr-sdk-cache
@@ -103,8 +115,7 @@ jobs:
           fi
           west update
 
-      - name: Build rsgdb (release)
-        run: cargo build --release --verbose
-
       - name: Run Zephyr native_sim E2E
+        env:
+          RSGDB: ${{ github.workspace }}/target/debug/rsgdb
         run: ./scripts/e2e_zephyr_native_sim.sh

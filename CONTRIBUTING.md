@@ -101,7 +101,7 @@ RUN_E2E_ZEPHYR_NATIVE=1 ./scripts/validate_local.sh
 ### GitHub Actions (optional E2E parity)
 
 - **GDB smoke** — the **CI** workflow includes an Ubuntu job that runs `scripts/e2e_gdb_smoke.sh` after `cargo build --release` (same idea as `RUN_E2E_GDB=1` with `validate_local.sh`, without duplicating fmt/clippy/doc in that job).
-- **Zephyr `native_sim`** — the **Zephyr E2E** workflow (`.github/workflows/zephyr-e2e.yml`) provisions a cached west workspace, then runs `scripts/e2e_zephyr_native_sim.sh`. It runs when `scripts/e2e_zephyr_native_sim.sh` or `scripts/zephyr_multi_printf_app/` change, on pushes to `main`/`develop` for those paths, on a weekly schedule, and via **workflow_dispatch** (Actions → Zephyr E2E → Run workflow). This mirrors `RUN_E2E_ZEPHYR_NATIVE=1` locally without checking a Zephyr tree into this repo.
+- **Zephyr `native_sim`** — the **Zephyr E2E** workflow (`.github/workflows/zephyr-e2e.yml`) provisions a cached west workspace, then runs `scripts/e2e_zephyr_native_sim.sh`. It runs when `scripts/e2e_zephyr_native_sim.sh` or `scripts/zephyr_multi_printf_app/` change, on pushes to `main`/`develop` for those paths, on a weekly schedule, and via **workflow_dispatch** (Actions → Zephyr E2E → Run workflow). This mirrors `RUN_E2E_ZEPHYR_NATIVE=1` locally without checking a Zephyr tree into this repo. The workflow builds **`target/debug/rsgdb`** (not release) and frees some preinstalled SDKs on the runner so the job fits on the GitHub-hosted disk.
 
 ### Issue tracking
 
