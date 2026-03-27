@@ -24,5 +24,3 @@ impl Default for LoggerConfig {
         }
     }
 }
-
-// Made with Bob

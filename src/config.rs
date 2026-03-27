@@ -471,5 +471,3 @@ mod tests {
         assert_eq!(config.logging.level, "debug");
     }
 }
-
-// Made with Bob

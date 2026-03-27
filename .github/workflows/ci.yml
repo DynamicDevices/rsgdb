@@ -151,5 +151,3 @@ jobs:
           name: rsgdb-${{ matrix.os }}
           path: |
             target/release/rsgdb${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-
-# Made with Bob

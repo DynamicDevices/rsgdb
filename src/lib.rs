@@ -4,11 +4,11 @@
 //!
 //! ## Features
 //!
-//! - **Enhanced Logging**: Comprehensive protocol traffic logging with structured output
-//! - **Advanced Breakpoints**: Named, conditional, and grouped breakpoint management
-//! - **State Tracking**: Memory snapshots, register tracking, and peripheral decoding
-//! - **Session Recording**: Record and replay debugging sessions
-//! - **Backend Flexibility**: Support for multiple debug probes
+//! - **Logging**: Protocol traffic and optional SVD/RTOS decode logs (`tracing`)
+//! - **Proxy**: TCP RSP forward between GDB and a stub (OpenOCD, probe-rs, etc.)
+//! - **Recording / replay**: JSONL session capture and `replay` mock backend
+//! - **SVD**: Read-only peripheral/register (and field) labels for memory packets in logs
+//! - **Breakpoints / state / UI**: Lightweight modules and config for future work; proxy does not rewrite breakpoint RSP yet
 //!
 //! ## Example
 //!
@@ -55,5 +55,3 @@ mod tests {
         assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
     }
 }
-
-// Made with Bob

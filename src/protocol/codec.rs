@@ -206,5 +206,3 @@ mod tests {
         assert_eq!(&buf[..], b"+");
     }
 }
-
-// Made with Bob

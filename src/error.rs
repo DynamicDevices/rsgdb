@@ -77,5 +77,3 @@ pub type Result<T> = std::result::Result<T, RsgdbError>;
 
 /// Result type alias for configuration operations
 pub type ConfigResult<T> = std::result::Result<T, ConfigError>;
-
-// Made with Bob

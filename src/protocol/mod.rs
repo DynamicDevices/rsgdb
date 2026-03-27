@@ -144,5 +144,3 @@ mod tests {
         assert_eq!(bytes, b"$qSupported#37");
     }
 }
-
-// Made with Bob

@@ -54,5 +54,3 @@ mod tests {
         assert_eq!(bp.address, 0x8000);
     }
 }
-
-// Made with Bob

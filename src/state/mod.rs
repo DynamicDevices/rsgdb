@@ -14,5 +14,3 @@ pub enum TargetState {
     /// Target state is unknown
     Unknown,
 }
-
-// Made with Bob

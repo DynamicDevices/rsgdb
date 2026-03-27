@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 [![Crates.io](https://img.shields.io/crates/v/rsgdb.svg)](https://crates.io/crates/rsgdb)
 
-A modern, feature-rich GDB server/proxy written in Rust, designed to enhance embedded debugging workflows with advanced logging, state inspection, and breakpoint management capabilities.
+A Rust GDB **RSP proxy** with structured logging, optional CMSIS-SVD memory labels, JSONL session recording/replay, RTOS packet decode logs, and external flash orchestration — with room to grow into richer breakpoints and UIs.
 
 ## 🎯 Project Goals
 
@@ -21,17 +21,17 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 ## ✨ Key Features
 
 ### Current (v0.1.0 - In Development)
-- 🚧 GDB Remote Serial Protocol (RSP) parser
-- 🚧 Basic proxy/pass-through mode
-- 🚧 Structured logging infrastructure
-- 🚧 Configuration system
+- ✅ GDB Remote Serial Protocol (RSP) codec + command parse (see `tests/rsp_codec_matrix.rs`)
+- ✅ Transparent TCP proxy (integration tests; forwards RSP bytes)
+- ✅ Structured logging (`tracing`, config-driven)
+- ✅ TOML + env configuration
 - 💾 **Session recording (rsgdb-record v1)** — ordered RSP trace as JSON Lines (`.jsonl`)
 - ▶️ **`rsgdb replay`** — load a recording and serve a **mock TCP backend** for one client (order-preserving playback / tests)
 - 📝 **SVD annotation (read-only)** — CMSIS-SVD → log labels for memory RSP (`m` / `M`): `Peripheral.REGISTER`, overlapping **fields**, and enumerated **variant names** where present (`target: rsgdb::svd`, debug)
 - ⚡ **`rsgdb flash`** — run a configured external flash tool (`[flash].program` with `{image}` substitution; OpenOCD/probe-rs/etc.)
 - 🧵 **RTOS RSP decode / log (Zephyr-first)** — thread-extension packets are decoded and logged at `target: rsgdb::rtos` (debug). Thread *data* comes from your stub (e.g. OpenOCD **Zephyr** RTOS awareness); other RTOSes use the same GDB RSP when the stub implements them (see below).
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), `scripts/e2e_gdb_smoke.sh` (Ubuntu job in **CI** workflow). **Zephyr `native_sim`** E2E (`scripts/e2e_zephyr_native_sim.sh`) runs in the **Zephyr E2E** workflow when those scripts/app change, on `main`/`develop`, weekly, or manually. See [CONTRIBUTING.md](CONTRIBUTING.md).
-- ✅ **Phase A (trust path)** — RSP codec matrix tests (`tests/rsp_codec_matrix.rs`, `scripts/e2e_rsp_regression.sh`), proxy TCP tests, ops matrix in README above.
+- ✅ **Phase A (trust path)** — RSP codec matrix tests (`tests/rsp_codec_matrix.rs`, `scripts/e2e_rsp_regression.sh`), proxy TCP integration tests (`tests/proxy_integration.rs`).
 - 📎 **Phase B (GDB productivity)** — [`scripts/gdbinit.rsgdb.example`](scripts/gdbinit.rsgdb.example), `qSupported`-style proxy test, backend thread-reply summaries in `rsgdb::rtos` (decode/log only).
 
 ### Planned
