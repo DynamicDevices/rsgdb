@@ -105,19 +105,32 @@ echo "==> rsgdb :$PROXY_PORT -> 127.0.0.1:$GDB_PORT"
 RSGDB_PID=$!
 wait_listen "$PROXY_PORT"
 
-echo "==> gdb batch (host gdb — same architecture as zephyr.exe)"
+# hello_world sample: printf is on line 11 of src/main.c (see Zephyr tree).
+HELLO_SRC="$ZEPHYR_WORKSPACE/zephyr/samples/hello_world/src/main.c"
+if [[ ! -f "$HELLO_SRC" ]]; then
+  echo "error: expected $HELLO_SRC (hello_world sample)" >&2
+  exit 1
+fi
+
+echo "==> gdb batch (host gdb — breakpoint on hello_world printf line)"
 OUT=$(gdb -nx --batch \
   -ex "set pagination off" \
   -ex "target extended-remote 127.0.0.1:$PROXY_PORT" \
-  -ex "break main" \
+  -ex "break \"$HELLO_SRC\":11" \
   -ex "continue" \
+  -ex "list" \
   -ex "quit" \
   "$ZEPHYR_EXE" 2>&1) || true
 
 echo "$OUT"
 
 if ! echo "$OUT" | grep -qE 'Breakpoint|Temporary breakpoint'; then
-  echo "error: expected GDB to hit a breakpoint at main" >&2
+  echo "error: expected GDB to set a breakpoint" >&2
+  exit 1
+fi
+
+if ! echo "$OUT" | grep -qE 'hello_world/src/main\.c:11|main\.c:11'; then
+  echo "error: expected GDB to stop at hello_world/src/main.c line 11 (printf)" >&2
   exit 1
 fi
 
