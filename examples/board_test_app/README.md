@@ -62,6 +62,22 @@ gdb-multiarch -ex "set debuginfod enabled off" \
   -ex "target extended-remote 127.0.0.1:3333"
 ```
 
+### Visual debug (VS Code / Cursor)
+
+Use the **repository root** as the workspace folder so `${workspaceFolder}` resolves correctly.
+
+1. Install the **C/C++** extension (`ms-vscode.cpptools`) — Cursor/VS Code may prompt from [`.vscode/extensions.json`](../../.vscode/extensions.json).
+2. Install **`gdb-multiarch`** on the host (e.g. `sudo apt install gdb-multiarch`).
+3. **SSH**: same as above — keys or `RSGDB_SSH_PASSWORD` for non-interactive `scp`/`ssh`. For password auth, start VS Code from a shell where `RSGDB_SSH_PASSWORD` is exported, or rely on SSH keys.
+4. **Run and Debug**: pick **`rsgdb: board_test_app (build, start proxy, debug)`** — it runs tasks that:
+   - build **`target/release/rsgdb`** if missing,
+   - **`make`** the example ELF,
+   - start **`rsgdb`** with [`rsgdb.remote.toml`](rsgdb.remote.toml) (waits until the proxy is listening on **127.0.0.1:3333**),
+   - then attaches **GDB** to that port with **`useExtendedRemote`** (same path as manual GDB).
+5. If **`rsgdb` is already running** (e.g. you started it in a terminal), use **`rsgdb: board_test_app (proxy already running)`** so the preLaunch task is not started twice.
+
+**Troubleshooting:** If something else holds **3333/tcp**, stop it or change **`listen_port`** in `rsgdb.remote.toml` and **`miDebuggerServerAddress`** / **`preLaunchTask`** references in [`.vscode/launch.json`](../../.vscode/launch.json). Only **one** GDB client should use the proxy at a time.
+
 ### Manual gdbserver on target
 
 On the **target**:

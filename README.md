@@ -228,6 +228,8 @@ Enable thread-oriented logs with e.g. `RUST_LOG=rsgdb::rtos=debug,rsgdb=info` (o
 
 This README, [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), and [RELEASING.md](RELEASING.md) (maintainer release checklist). Design notes: [docs/ADR-001-breakpoints-semihosting.md](docs/ADR-001-breakpoints-semihosting.md) (breakpoint policy + semihosting spike).
 
+**Visual debugging (VS Code / Cursor):** open the **repo root** as the workspace. Shared [`.vscode/launch.json`](.vscode/launch.json) and [`.vscode/tasks.json`](.vscode/tasks.json) drive **`rsgdb`** then attach **GDB** (`gdb-multiarch`) to **`127.0.0.1:<listen_port>`** — same RSP path as the CLI. See [`examples/board_test_app/README.md`](examples/board_test_app/README.md) § *Visual debug*.
+
 ## Releases
 
 - **Development**: tagged pre-releases (e.g. **`v0.2.0-dev.1`**) are documented in [`CHANGELOG.md`](CHANGELOG.md); see [`RELEASING.md`](RELEASING.md) to cut the next tag.
@@ -306,6 +308,7 @@ RUST_LOG=debug cargo run
 rsgdb/
 ├── src/                     # Library + CLI
 ├── tests/                   # Integration tests
+├── .vscode/                 # shared VS Code / Cursor: launch + tasks (board_test_app remote debug)
 ├── examples/board_test_app/ # remote Linux target smoke (Makefile, rsgdb.remote.toml, helper scripts)
 ├── CHANGELOG.md
 ├── RELEASING.md

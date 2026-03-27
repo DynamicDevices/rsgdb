@@ -1,0 +1,46 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "rsgdb: board_test_app (build, start proxy, debug)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/examples/board_test_app/board_test_app",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb-multiarch",
+      "miDebuggerServerAddress": "127.0.0.1:3333",
+      "useExtendedRemote": true,
+      "preLaunchTask": "rsgdb: board_test_app (build + proxy)",
+      "setupCommands": [
+        {
+          "text": "set debuginfod enabled off",
+          "description": "Avoid batch hangs / noise when debuginfod is unavailable",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      "name": "rsgdb: board_test_app (proxy already running)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/examples/board_test_app/board_test_app",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb-multiarch",
+      "miDebuggerServerAddress": "127.0.0.1:3333",
+      "useExtendedRemote": true,
+      "setupCommands": [
+        {
+          "text": "set debuginfod enabled off",
+          "description": "Avoid batch hangs / noise when debuginfod is unavailable",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}

@@ -6,8 +6,11 @@ examples/board_test_app/board_test_app
 **/*.rs.bk
 *.pdb
 
-# IDE
-.vscode/
+# IDE — keep shared debug configs; ignore local settings
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
