@@ -6,8 +6,22 @@ use rsgdb::protocol::codec::{GdbCodec, PacketOrAck};
 use rsgdb::protocol::Packet;
 use rsgdb::proxy::ProxyServer;
 use rsgdb::recorder::{RecordDirection, RecordEventV1};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::Framed;
+
+/// Same as `proxy_integration`: listeners on `0.0.0.0` must be reached via loopback on Windows.
+fn connect_addr(listen: SocketAddr) -> SocketAddr {
+    match listen {
+        SocketAddr::V4(a) if a.ip().is_unspecified() => {
+            SocketAddr::new(Ipv4Addr::LOCALHOST.into(), a.port())
+        }
+        SocketAddr::V6(a) if a.ip().is_unspecified() => {
+            SocketAddr::new(Ipv6Addr::LOCALHOST.into(), a.port())
+        }
+        _ => listen,
+    }
+}
 
 #[tokio::test]
 async fn replay_mock_backend_round_trip_through_proxy() {
@@ -53,7 +67,7 @@ async fn replay_mock_backend_round_trip_through_proxy() {
 
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-    let client = TcpStream::connect(proxy_addr)
+    let client = TcpStream::connect(connect_addr(proxy_addr))
         .await
         .expect("connect to proxy");
     let mut framed = Framed::new(client, GdbCodec::new());
