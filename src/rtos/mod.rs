@@ -4,6 +4,10 @@
 //! `zephyr` RTOS awareness or equivalent). The wire protocol is standard GDB RSP; FreeRTOS, ThreadX, etc.
 //! use the same packet shapes when the stub implements them.
 
+mod backend_reply;
+
+pub use backend_reply::summarize_backend_thread_payload;
+
 /// Summarize a stop-reply `T…` packet for logging (often includes `thread:…` from RTOS-aware stubs).
 pub fn summarize_stop_reply(data: &[u8]) -> Option<String> {
     let s = std::str::from_utf8(data).ok()?;

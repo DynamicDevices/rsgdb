@@ -377,6 +377,13 @@ impl ProxySession {
                     "stop reply"
                 );
             }
+        } else if let Some(note) = rtos::summarize_backend_thread_payload(&p.data) {
+            tracing::debug!(
+                target: "rsgdb::rtos",
+                direction = "backend_to_client",
+                summary = %note,
+                "backend thread reply"
+            );
         }
     }
 

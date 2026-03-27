@@ -30,6 +30,7 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 🧵 **RTOS RSP decode / log (Zephyr-first)** — thread-extension packets are decoded and logged at `target: rsgdb::rtos` (debug). Thread *data* comes from your stub (e.g. OpenOCD **Zephyr** RTOS awareness); other RTOSes use the same GDB RSP when the stub implements them (see below).
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), script `scripts/e2e_gdb_smoke.sh`; GitHub Actions job **E2E GDB smoke** (Ubuntu). See [CONTRIBUTING.md](CONTRIBUTING.md).
 - ✅ **Phase A (trust path)** — RSP codec matrix tests (`tests/rsp_codec_matrix.rs`, `scripts/e2e_rsp_regression.sh`), proxy TCP tests, ops matrix in README above.
+- 📎 **Phase B (GDB productivity)** — [`scripts/gdbinit.rsgdb.example`](scripts/gdbinit.rsgdb.example), `qSupported`-style proxy test, backend thread-reply summaries in `rsgdb::rtos` (decode/log only).
 
 ### Planned
 - 📊 Enhanced logging with filtering and export (JSON, CSV)
@@ -86,6 +87,14 @@ rsgdb is a **transparent TCP proxy**: GDB speaks RSP to rsgdb; rsgdb forwards th
 | Windows `connect` to `0.0.0.0` | Use `127.0.0.1` or the actual listener address from `ss` / `netstat`. |
 
 **Fast RSP regression (no gdb binary):** `./scripts/e2e_rsp_regression.sh` runs codec + proxy integration tests only.
+
+### GDB productivity (Phase B)
+
+- **Example GDB init:** [`scripts/gdbinit.rsgdb.example`](scripts/gdbinit.rsgdb.example) — `pagination off`, optional `set debug remote 1`, and a commented `target extended-remote` line. Copy or `gdb -x scripts/gdbinit.rsgdb.example` after adjusting the port.
+- **Transparency:** integration tests include a **`qSupported:…`-style** packet round-trip so negotiation-shaped payloads are not mangled by the proxy.
+- **Thread replies (read-only logs):** when the stub sends thread-list / `QC` / hex name replies, **`rsgdb::rtos`** logs a short summary for **backend → client** packets (same wire bytes; no RSP injection).
+
+Enable with e.g. `RUST_LOG=rsgdb::rtos=debug,rsgdb=info`.
 
 ### Configuration
 
@@ -242,6 +251,7 @@ rsgdb/
 ├── scripts/e2e_gdb_smoke.sh      # gdbserver → rsgdb → gdb (batch); CI E2E job
 ├── scripts/e2e_zephyr_native_sim.sh  # optional: west build native_sim + multi-printf stepping test
 ├── scripts/e2e_rsp_regression.sh     # fast: codec + proxy integration only (no gdb)
+├── scripts/gdbinit.rsgdb.example     # optional GDB init snippet for use with rsgdb
 ├── scripts/zephyr_multi_printf_app/  # tiny Zephyr app for that script (west -s)
 ├── rsgdb.toml.example
 └── .github/workflows/

@@ -1,0 +1,11 @@
+# Example GDB init for use with rsgdb (copy to ~/.gdbinit or use: gdb -x scripts/gdbinit.rsgdb.example)
+# rsgdb listens for GDB; your stub (OpenOCD, gdbserver, …) listens on target_host:target_port.
+
+set pagination off
+set confirm off
+
+# Optional: see raw RSP traffic in GDB (verbose; use when debugging proxy vs stub issues)
+# set debug remote 1
+
+# Typical connection (adjust host/port to match rsgdb --port)
+# target extended-remote localhost:3333

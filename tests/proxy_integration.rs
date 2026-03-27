@@ -103,6 +103,41 @@ async fn proxy_forwards_rsp_packet_to_backend_and_back() {
     run.abort();
 }
 
+/// Feature negotiation shape (`qSupported:…`) — must round-trip unchanged (Phase B transparency).
+#[tokio::test]
+async fn proxy_round_trips_qsupported_style_negotiation() {
+    let backend = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind backend");
+    let backend_port = backend.local_addr().expect("backend addr").port();
+
+    let backend_task = tokio::spawn(echo_backend_accept_loop(backend));
+    let (proxy_listen, run) = setup_proxy_to_backend(backend_port).await;
+
+    let client = tokio::net::TcpStream::connect(connect_addr(proxy_listen))
+        .await
+        .expect("connect to proxy");
+    let mut client = Framed::new(client, GdbCodec::new());
+
+    let payload = b"qSupported:multiprocess+;xmlRegisters=i386;swbreak+;hwbreak+".as_slice();
+    let pkt = Packet::new(payload.to_vec());
+    client.send(PacketOrAck::Packet(pkt)).await.expect("send");
+
+    let got = client
+        .next()
+        .await
+        .expect("stream ended")
+        .expect("decode ok");
+    match got {
+        PacketOrAck::Packet(p) => assert_eq!(p.data.as_slice(), payload),
+        other => panic!("expected packet, got {:?}", other),
+    }
+
+    drop(client);
+    backend_task.abort();
+    run.abort();
+}
+
 /// GDB "last signal" query: `$?#3f` — exercises checksum path used by real sessions.
 #[tokio::test]
 async fn proxy_round_trips_last_signal_query_packet() {

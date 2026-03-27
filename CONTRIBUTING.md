@@ -56,6 +56,11 @@ Codec framing + proxy TCP integration tests only (~1s):
 
 Use this when iterating on `src/protocol/codec.rs` or `tests/proxy_integration.rs` without running the full `cargo test` suite.
 
+### Phase B — GDB snippet + thread reply logging
+
+- Copy or source [`scripts/gdbinit.rsgdb.example`](scripts/gdbinit.rsgdb.example) when connecting GDB through rsgdb (adjust `target extended-remote` to your listen port).
+- Backend **thread-related** RSP replies (`m…` / `l` / `QC…` / hex thread names) get short summaries at **`rsgdb::rtos`** (debug); packets are unchanged on the wire.
+
 ### Simulated GDB session (optional, Linux/macOS)
 
 End-to-end smoke: **gdbserver → rsgdb → GDB** (batch), same shape as CI job **E2E GDB smoke**.
