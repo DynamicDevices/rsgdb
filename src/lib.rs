@@ -27,6 +27,7 @@ pub mod breakpoints;
 pub mod config;
 pub mod error;
 pub mod logger;
+mod logging_setup;
 pub mod protocol;
 pub mod proxy;
 pub mod recorder;
@@ -36,6 +37,7 @@ pub mod ui;
 // Re-export commonly used types
 pub use config::Config;
 pub use error::{Result, RsgdbError};
+pub use logging_setup::{init_from_logging_config, LoggingInitGuard};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

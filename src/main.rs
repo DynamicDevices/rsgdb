@@ -5,9 +5,9 @@
 use clap::Parser;
 use rsgdb::config::Config;
 use rsgdb::proxy::ProxyServer;
+use rsgdb::{init_from_logging_config, LoggingInitGuard};
 use std::path::PathBuf;
 use tracing::{error, info};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Command-line arguments
 #[derive(Parser, Debug)]
@@ -43,24 +43,15 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let args = Args::parse();
 
-    // Initialize tracing
-    init_tracing(args.verbose, args.debug);
-
-    info!("Starting rsgdb v{}", env!("CARGO_PKG_VERSION"));
-
-    // Load configuration
-    let mut config = if let Some(config_path) = args.config {
-        info!("Loading configuration from {:?}", config_path);
-        Config::from_file(&config_path)?
+    let mut config = if let Some(config_path) = &args.config {
+        Config::from_file(config_path)?
     } else {
-        info!("Using default configuration");
         Config::default()
     };
 
-    // Environment overrides file/defaults; CLI overrides env (see also merge_env docs on Config)
     config.merge_env();
 
     if let Some(port) = args.port {
@@ -78,15 +69,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     config.validate()?;
 
+    let _log_guard: LoggingInitGuard =
+        init_from_logging_config(&config.logging, args.verbose, args.debug)?;
+
+    info!("Starting rsgdb v{}", env!("CARGO_PKG_VERSION"));
+    if let Some(config_path) = &args.config {
+        info!("Loaded configuration from {:?}", config_path);
+    } else {
+        info!("Using default configuration");
+    }
+
+    info!(
+        backend_type = %config.backend.backend_type,
+        "Configured debug backend (for future integration)"
+    );
+
     info!("Configuration: {:?}", config);
 
-    // Create and run the proxy server
     let mut server = ProxyServer::new(config.proxy).await?;
 
-    info!("Proxy server started successfully");
-    info!("Waiting for GDB connections...");
+    info!(
+        listen = %server.local_addr()?,
+        "Proxy server listening for GDB connections"
+    );
 
-    // Run the server
     if let Err(e) = server.run().await {
         error!("Server error: {}", e);
         return Err(e.into());
@@ -94,23 +100,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
-/// Initialize tracing/logging
-fn init_tracing(verbose: bool, debug: bool) {
-    let filter = if debug {
-        "rsgdb=debug"
-    } else if verbose {
-        "rsgdb=info"
-    } else {
-        "rsgdb=warn"
-    };
-
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| filter.into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-}
-
-// Made with Bob

@@ -1,0 +1,13 @@
+---
+description: How to work through rsgdb GitHub issues and validate changes
+globs: "**/*"
+alwaysApply: true
+---
+
+# rsgdb issue workflow
+
+- **Dependencies** are tracked on GitHub (blocked-by). Part A order: **#1 → #3**; **#2** is parallel (remote board checklist). Roadmap **#4** is blocked by **#3**.
+- **Before claiming work complete:** run `./scripts/validate_local.sh` from the repo root (matches CI: fmt, test `--all-features`, clippy `-D warnings`, `cargo doc` with `RUST_LOG` not required).
+- **Scope:** implement tickets in order; do not expand scope into roadmap (#4+) unless the issue says so.
+- **Evidence:** cite successful script output or test counts; do not assume fixes work without running tests.
+- **Closing issues:** reference `Closes #N` in the PR/commit when a ticket is fully done.

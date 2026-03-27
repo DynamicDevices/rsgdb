@@ -45,11 +45,12 @@ pub struct ProxyConfig {
     #[serde(default = "default_target_port")]
     pub target_port: u16,
 
-    /// Enable packet acknowledgments
+    /// Reserved for future RSP ack policy; the proxy always forwards `+`/`-` today.
     #[serde(default = "default_true")]
     pub enable_acks: bool,
 
-    /// Connection timeout in seconds
+    /// Max time to establish the TCP connection to the backend (`0` = no limit). Does not apply
+    /// to idle GDB sessions (no read timeout).
     #[serde(default = "default_timeout")]
     pub timeout_secs: u64,
 }

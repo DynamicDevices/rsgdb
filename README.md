@@ -135,7 +135,10 @@ cargo build --release
 # Run tests
 cargo test
 
-# Run with logging
+# Match CI before pushing (fmt, clippy, tests --all-features, doc)
+./scripts/validate_local.sh
+
+# Run with logging (also respects [logging] in rsgdb.toml after init)
 RUST_LOG=debug cargo run
 ```
 
@@ -143,19 +146,11 @@ RUST_LOG=debug cargo run
 
 ```
 rsgdb/
-├── src/
-│   ├── main.rs              # CLI entry point
-│   ├── lib.rs               # Library root
-│   ├── proxy/               # Core proxy logic
-│   ├── protocol/            # RSP protocol handling
-│   ├── breakpoints/         # Breakpoint management
-│   ├── state/               # State tracking
-│   ├── logger/              # Enhanced logging
-│   ├── backends/            # Debug probe backends
-│   ├── recorder/            # Session recording
-│   └── ui/                  # User interfaces
-├── rsgdb.toml.example       # Sample configuration
-└── .github/workflows/       # CI
+├── src/                     # Library + CLI
+├── tests/                   # Integration tests
+├── scripts/validate_local.sh
+├── rsgdb.toml.example
+└── .github/workflows/
 ```
 
 ## 🤝 Contributing

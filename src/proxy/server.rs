@@ -5,11 +5,14 @@
 use crate::config::ProxyConfig;
 use crate::error::RsgdbError;
 use crate::protocol::codec::{GdbCodec, PacketOrAck};
+use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
+use tokio::time::timeout;
 use tokio_util::codec::Framed;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Proxy server that bridges GDB clients and debug backends
 pub struct ProxyServer {
@@ -28,6 +31,11 @@ impl ProxyServer {
         info!("Proxy server listening on {}", addr);
 
         Ok(Self { config, listener })
+    }
+
+    /// Local socket address this server is bound to (useful when `listen_port` is `0`).
+    pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
+        self.listener.local_addr()
     }
 
     /// Run the proxy server
@@ -65,9 +73,24 @@ async fn handle_connection(
     let backend_addr = format!("{}:{}", config.target_host, config.target_port);
     debug!("Connecting to backend at {}", backend_addr);
 
-    let backend_socket = TcpStream::connect(&backend_addr)
+    let backend_socket = if config.timeout_secs == 0 {
+        TcpStream::connect(&backend_addr)
+            .await
+            .map_err(RsgdbError::Io)?
+    } else {
+        timeout(
+            Duration::from_secs(config.timeout_secs),
+            TcpStream::connect(backend_addr.clone()),
+        )
         .await
-        .map_err(RsgdbError::Io)?;
+        .map_err(|_| {
+            RsgdbError::Timeout(format!(
+                "TCP connect to backend {} exceeded {}s",
+                backend_addr, config.timeout_secs
+            ))
+        })?
+        .map_err(RsgdbError::Io)?
+    };
 
     info!("Connected to backend at {}", backend_addr);
 
@@ -122,6 +145,12 @@ impl ProxySession {
             "Session settings: enable_acks={}, timeout_secs={}",
             self.config.enable_acks, self.config.timeout_secs
         );
+        if !self.config.enable_acks {
+            warn!(
+                "proxy.enable_acks is false: RSP +/- bytes are still forwarded; use GDB \
+                 `set remote noack-packet` / `set remote interrupt-sequence` for protocol-level ack behavior"
+            );
+        }
 
         loop {
             tokio::select! {

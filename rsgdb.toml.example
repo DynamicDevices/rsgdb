@@ -11,10 +11,10 @@ target_host = "localhost"
 # Target port to connect to
 target_port = 3334
 
-# Enable packet acknowledgments
+# Reserved for future RSP ack policy; proxy always forwards +/- today (see README)
 enable_acks = true
 
-# Connection timeout in seconds
+# Backend TCP connect timeout in seconds (0 = wait indefinitely). Idle GDB sessions are not timed out.
 timeout_secs = 30
 
 [logging]

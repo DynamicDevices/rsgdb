@@ -36,6 +36,32 @@ We are committed to providing a welcoming and inclusive environment. Please be r
    cargo test
    ```
 
+### Local validation (before you open a PR)
+
+From the repo root, run the same checks CI uses (fmt, tests with `--all-features`, clippy with `-D warnings`, docs with warnings denied):
+
+```bash
+./scripts/validate_local.sh
+```
+
+On Windows, use **Git Bash** or **WSL** so the script runs, or run the `cargo` commands from that script by hand.
+
+### Issue tracking
+
+Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issues). **Blocked-by** dependencies define order (e.g. Part A **#1 → #3**; **#2** can run in parallel). Close an issue from a PR with `Closes #N` when it is fully done.
+
+### Remote board smoke (manual)
+
+Use this when a probe and target are available (optional OpenOCD or probe-rs GDB port):
+
+1. Start your **backend** (e.g. OpenOCD) and note its **GDB TCP port** (often `3333`).
+2. Start **rsgdb** so it listens for GDB and forwards to that port, e.g.  
+   `rsgdb --port 3334 --target-host 127.0.0.1 --target-port 3333`
+3. From GDB: `target extended-remote 127.0.0.1:3334`
+4. Confirm: **break** / **continue** / **step** / `info reg` (or `x/4xw` on a valid address).
+
+Success means the session behaves the same **with** rsgdb in the path as **without** (direct to OpenOCD), aside from added logging. Capture ports and commands in the issue if something fails.
+
 ## Development Workflow
 
 ### Branch Naming
@@ -223,26 +249,12 @@ Understanding the project structure will help you navigate the codebase:
 
 ```
 rsgdb/
-├── src/
-│   ├── main.rs              # CLI entry point
-│   ├── lib.rs               # Library root
-│   ├── proxy/               # Core proxy logic
-│   │   ├── mod.rs
-│   │   ├── server.rs        # GDB server implementation
-│   │   └── client.rs        # Backend client
-│   ├── protocol/            # RSP protocol handling
-│   │   ├── mod.rs
-│   │   ├── parser.rs        # Packet parsing
-│   │   └── commands.rs      # Command handling
-│   ├── breakpoints/         # Breakpoint management
-│   ├── state/               # State tracking
-│   ├── logger/              # Enhanced logging
-│   ├── backends/            # Debug probe backends
-│   ├── recorder/            # Session recording
-│   └── ui/                  # User interfaces
-├── tests/                   # Integration tests
-├── examples/                # Usage examples
-└── docs/                    # Documentation
+├── src/                     # Library + binary
+├── tests/                   # Integration tests (e.g. proxy RSP smoke)
+├── scripts/
+│   └── validate_local.sh    # Local CI parity (run before PRs)
+├── rsgdb.toml.example
+└── .github/workflows/       # CI
 ```
 
 ## Areas for Contribution
