@@ -28,6 +28,10 @@ fn rsp_read_memory_m_packet_maps_to_register() {
                 note.contains("GPIOA.MODER"),
                 "annotation should name MODER: {note}"
             );
+            assert!(
+                note.contains("MODE0") && note.contains("MODE1"),
+                "annotation should list field names: {note}"
+            );
         }
         other => panic!("expected ReadMemory, got {other:?}"),
     }
@@ -47,6 +51,10 @@ fn rsp_write_memory_m_packet_maps_to_register() {
             assert!(
                 note.contains("GPIOA.MODER"),
                 "annotation should name MODER: {note}"
+            );
+            assert!(
+                note.contains("MODE0"),
+                "expected field overlap in note: {note}"
             );
         }
         other => panic!("expected WriteMemory, got {other:?}"),

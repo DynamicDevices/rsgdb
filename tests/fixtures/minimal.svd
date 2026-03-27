@@ -14,6 +14,28 @@
           <name>MODER</name>
           <addressOffset>0x0</addressOffset>
           <size>32</size>
+          <fields>
+            <field>
+              <name>MODE0</name>
+              <bitOffset>0</bitOffset>
+              <bitWidth>2</bitWidth>
+              <enumeratedValues>
+                <enumeratedValue>
+                  <name>Input</name>
+                  <value>0</value>
+                </enumeratedValue>
+                <enumeratedValue>
+                  <name>Output</name>
+                  <value>1</value>
+                </enumeratedValue>
+              </enumeratedValues>
+            </field>
+            <field>
+              <name>MODE1</name>
+              <bitOffset>2</bitOffset>
+              <bitWidth>2</bitWidth>
+            </field>
+          </fields>
         </register>
         <register>
           <name>BSRR</name>

@@ -32,6 +32,7 @@ mod logging_setup;
 pub mod protocol;
 pub mod proxy;
 pub mod recorder;
+pub mod replay;
 pub mod rtos;
 pub mod state;
 pub mod svd;

@@ -109,7 +109,7 @@ Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issue
 
 **Status (short):** Part A (**#1–#3**), session recording (**#4**), SVD baseline (**#5**), breakpoint/semihosting spike (**#6**), flash orchestration (**#7**), RTOS decode/log (**#8**) are **closed**. **Phase A/B** (RSP matrix + proxy tests, gdbinit, backend thread reply logging) are in-tree; see README. **CI:** main workflow (**CI**) + optional **Zephyr E2E** (`native_sim`, debug `rsgdb`, west venv + `pyelftools`) — both green on `main`.
 
-**Next roadmap issues (open):** [#9](https://github.com/DynamicDevices/rsgdb/issues/9) native probe backend, [#10](https://github.com/DynamicDevices/rsgdb/issues/10) session replay from JSONL, [#11](https://github.com/DynamicDevices/rsgdb/issues/11) richer SVD (fields/enums).
+**Next roadmap focus (open):** [#9](https://github.com/DynamicDevices/rsgdb/issues/9) native probe / backend beyond TCP. **In-tree:** session replay ([#10](https://github.com/DynamicDevices/rsgdb/issues/10) — `rsgdb replay`), SVD field + enum labels in memory annotations ([#11](https://github.com/DynamicDevices/rsgdb/issues/11) — baseline; correlation with recordings may remain on the issue).
 
 **CI jobs (overview):** Workflow **CI**: `test` (matrix), `fmt`, `clippy`, `docs`, `e2e-gdb-smoke`, `coverage`, `build` (artifacts; upload may use `continue-on-error` for transient infra). Workflow **Zephyr E2E**: west + SDK + `scripts/e2e_zephyr_native_sim.sh` (path / schedule / `workflow_dispatch`).
 
@@ -328,10 +328,10 @@ We welcome contributions in these areas (see **[open issues](https://github.com/
 
 ### High priority (roadmap)
 - [ ] **Native probe / backend abstraction** — [#9](https://github.com/DynamicDevices/rsgdb/issues/9)
-- [ ] **Session replay from JSONL** — [#10](https://github.com/DynamicDevices/rsgdb/issues/10)
+- [x] **Session replay from JSONL** — [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (`rsgdb replay`)
 
 ### Medium priority
-- [ ] **Richer SVD (fields, enums)** — [#11](https://github.com/DynamicDevices/rsgdb/issues/11)
+- [x] **Richer SVD (fields, enum names in annotations)** — [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (value decode / recording correlation still optional follow-ups)
 - [ ] TUI, advanced breakpoints, logging export — open an issue before large changes
 
 ### Always welcome

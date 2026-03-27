@@ -26,6 +26,15 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Replay a **rsgdb-record v1** JSONL file as a mock TCP backend (issue #10)
+    Replay {
+        /// Session file (`.jsonl`)
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+        /// Mock backend listen address (point `rsgdb` `--target-host` / `--target-port` here)
+        #[arg(long, default_value = "127.0.0.1:3334", value_name = "ADDR")]
+        listen: String,
+    },
     /// Flash firmware using `[flash].program` in config (orchestrates OpenOCD, probe-rs, etc.)
     Flash {
         /// Firmware image (binary, ELF, or whatever your tool expects)
@@ -90,6 +99,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Some(Commands::Replay { file, listen }) => run_replay(&file, &listen).await,
         Some(Commands::Flash {
             image,
             config,
@@ -97,6 +107,40 @@ async fn main() -> anyhow::Result<()> {
             debug,
         }) => run_flash_main(&image, config.as_deref(), verbose, debug),
         None => run_proxy(cli.proxy).await,
+    }
+}
+
+async fn run_replay(file: &Path, listen: &str) -> anyhow::Result<()> {
+    use rsgdb::replay::{load_session, run_mock_backend};
+    use tokio::net::TcpListener;
+
+    let mut config = Config::default();
+    config.merge_env();
+    let _log_guard: LoggingInitGuard = init_from_logging_config(&config.logging, false, false)
+        .map_err(|e| anyhow::anyhow!("logging init: {}", e))?;
+
+    let session = load_session(file).with_context(|| format!("load {}", file.display()))?;
+    let addr: std::net::SocketAddr = listen
+        .parse()
+        .with_context(|| format!("parse listen address {:?}", listen))?;
+    let listener = TcpListener::bind(addr).await?;
+    info!(
+        path = %file.display(),
+        addr = %listener.local_addr()?,
+        events = session.events.len(),
+        "Replay mock backend — connect rsgdb with e.g. --target-host 127.0.0.1 --target-port {}",
+        listener.local_addr()?.port()
+    );
+
+    loop {
+        let (sock, peer) = listener.accept().await?;
+        info!("Replay: backend connection from {}", peer);
+        let events = session.events.clone();
+        tokio::spawn(async move {
+            if let Err(e) = run_mock_backend(sock, events).await {
+                error!("replay session ended: {}", e);
+            }
+        });
     }
 }
 

@@ -2,6 +2,7 @@
 //!
 //! Handles incoming GDB client connections and forwards commands to the backend.
 
+use crate::backends::connect_tcp_backend;
 use crate::config::{ProxyConfig, RecordingConfig};
 use crate::error::RsgdbError;
 use crate::protocol::codec::{GdbCodec, PacketOrAck};
@@ -12,10 +13,8 @@ use crate::svd::SvdIndex;
 use futures::StreamExt;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
-use tokio::time::timeout;
 use tokio_util::codec::Framed;
 use tracing::{debug, error, info, warn};
 
@@ -89,28 +88,10 @@ async fn handle_connection(
     let peer_addr = client_socket.peer_addr().map_err(RsgdbError::Io)?;
     info!("Handling connection from {}", peer_addr);
 
-    // Connect to the backend
     let backend_addr = format!("{}:{}", config.target_host, config.target_port);
     debug!("Connecting to backend at {}", backend_addr);
 
-    let backend_socket = if config.timeout_secs == 0 {
-        TcpStream::connect(&backend_addr)
-            .await
-            .map_err(RsgdbError::Io)?
-    } else {
-        timeout(
-            Duration::from_secs(config.timeout_secs),
-            TcpStream::connect(backend_addr.clone()),
-        )
-        .await
-        .map_err(|_| {
-            RsgdbError::Timeout(format!(
-                "TCP connect to backend {} exceeded {}s",
-                backend_addr, config.timeout_secs
-            ))
-        })?
-        .map_err(RsgdbError::Io)?
-    };
+    let backend = connect_tcp_backend(&config).await?;
 
     info!("Connected to backend at {}", backend_addr);
 
@@ -127,7 +108,7 @@ async fn handle_connection(
     };
 
     // Create a session to manage the connection
-    let mut session = ProxySession::new(client_socket, backend_socket, config, recorder, svd);
+    let mut session = ProxySession::new(client_socket, backend, config, recorder, svd);
 
     // Run the session
     session.run().await?;
@@ -161,13 +142,12 @@ impl ProxySession {
     /// Create a new proxy session
     fn new(
         client_socket: TcpStream,
-        backend_socket: TcpStream,
+        backend: Framed<TcpStream, GdbCodec>,
         config: ProxyConfig,
         recorder: Option<SessionRecorder>,
         svd: Option<Arc<SvdIndex>>,
     ) -> Self {
         let client = Framed::new(client_socket, GdbCodec::new());
-        let backend = Framed::new(backend_socket, GdbCodec::new());
 
         Self {
             client,

@@ -36,7 +36,7 @@ pub enum RecordKind {
     Nack,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordEventV1 {
     pub ts: DateTime<Utc>,
     pub direction: RecordDirection,

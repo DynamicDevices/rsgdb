@@ -1,17 +1,9 @@
-//! Backends module
+//! Debug probe backends.
 //!
-//! Debug probe backend implementations (OpenOCD, probe-rs, pyOCD).
+//! Today the proxy uses [`tcp::connect_tcp_backend`] to reach a GDB stub over TCP. A fuller
+//! backend abstraction for native probes is tracked as
+//! [#9](https://github.com/DynamicDevices/rsgdb/issues/9).
 
-/// Backend trait for debug probes
-pub trait Backend {
-    /// Connect to the target
-    fn connect(&mut self) -> anyhow::Result<()>;
+mod tcp;
 
-    /// Disconnect from the target
-    fn disconnect(&mut self) -> anyhow::Result<()>;
-
-    /// Check if connected
-    fn is_connected(&self) -> bool;
-}
-
-// Made with Bob
+pub use tcp::connect_tcp_backend;

@@ -138,7 +138,7 @@ path = "device.svd"
 
 ### SVD labels (read-only)
 
-If `[svd] path` points to a valid CMSIS-SVD file (or use `--svd FILE` / env `RSGDB_SVD`), rsgdb builds a register map and emits **debug** logs for **client** memory packets (`m` read, `M` write) with a human-readable range when the access overlaps known registers — for example `GPIOA.MODER (4 bytes)`. This is **display only**; RSP bytes are unchanged.
+If `[svd] path` points to a valid CMSIS-SVD file (or use `--svd FILE` / env `RSGDB_SVD`), rsgdb builds a register map and emits **debug** logs for **client** memory packets (`m` read, `M` write) with a human-readable range when the access overlaps known registers — for example `GPIOA.MODER (4 bytes)` or, when the SVD lists fields, `GPIOA.MODER (4 bytes); fields: GPIOA.MODER.MODE0 [Input, Output], …`. Enumerated value **names** from the SVD are shown alongside fields; decoding actual register **values** against those enums is not implemented yet. This is **display only**; RSP bytes are unchanged.
 
 Enable the log target with e.g. `RUST_LOG=rsgdb::svd=debug,rsgdb=info` (or `-d` / verbose per your logging setup).
 
@@ -148,7 +148,7 @@ When enabled, each GDB↔backend connection writes one **JSON Lines** file under
 
 **Enable:** `rsgdb --record`, or set `[recording] enabled = true` in config, or `RSGDB_RECORD=1`. Optional directory override: `--record-dir DIR` or `RSGDB_RECORD_DIR`.
 
-**Replay:** There is no built-in replayer yet. Inspect `.jsonl` with your usual tools or `jq`. Work is tracked as [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (mock / automated playback for regression tests).
+**Replay:** `rsgdb replay <FILE.jsonl> [--listen ADDR]` (default `127.0.0.1:3334`) loads an `rsgdb-record` v1 session and listens for TCP; the **first** GDB client connection is served by a mock backend that replays `backend_to_client` / expects `client_to_backend` events in order (for regression tests and inspection). You can still inspect raw `.jsonl` with `jq` or other tools. Tracked as [#10](https://github.com/DynamicDevices/rsgdb/issues/10).
 
 ### Flash orchestration (`rsgdb flash`)
 
@@ -290,9 +290,9 @@ Source of truth for ordering and scope: **[GitHub Issues](https://github.com/Dyn
 | Milestone (docs) | What it means | Issue |
 |------------------|---------------|-------|
 | **Foundation + proxy** | RSP codec, TCP proxy, config, logging, CI (incl. GDB + Zephyr E2E), session record (JSONL), SVD labels, flash orchestration, RTOS decode/log | Closed: [#1–#8](https://github.com/DynamicDevices/rsgdb/issues?q=is%3Aissue+is%3Aclosed) |
-| **Next: native backend** | Probe-facing `Backend` (not only TCP stub) | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (open) |
-| **Next: replay** | Playback / mock backend from `.jsonl` recordings | [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (open) |
-| **Next: richer SVD** | Fields, enums, correlation with recordings | [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (open) |
+| **Next: native backend** | Probe-facing backend beyond TCP to a stub (see `backends::connect_tcp_backend`) | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (open) |
+| **Replay** | `rsgdb replay` + mock TCP backend from `.jsonl` | [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (implemented; close when shipped) |
+| **Richer SVD** | Overlapping fields + enum variant names in annotations; value decode / recording correlation follow-ups | [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (baseline in-tree) |
 
 Older versioned bullets (v0.2–v0.4) below are **aspirational**; issue titles supersede them.
 
