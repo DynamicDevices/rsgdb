@@ -70,7 +70,7 @@ Use this when iterating on `src/protocol/codec.rs` or `tests/proxy_integration.r
 
 ### Phase B — GDB snippet + thread reply logging
 
-- **VS Code / Cursor:** repo-root [`.vscode/launch.json`](.vscode/launch.json) and [`.vscode/tasks.json`](.vscode/tasks.json) attach **`gdb-multiarch`** to **`127.0.0.1:<rsgdb listen port>`** after starting **`rsgdb`** (see [`examples/board_test_app/README.md`](examples/board_test_app/README.md) § *Visual debug*). Requires the **C/C++** extension (`ms-vscode.cpptools`).
+- **VS Code / Cursor:** repo-root [`.vscode/launch.json`](.vscode/launch.json) and [`.vscode/tasks.json`](.vscode/tasks.json) — preLaunch runs [`examples/board_test_app/prepare_cursor_debug.sh`](examples/board_test_app/prepare_cursor_debug.sh), then **`cppdbg`** attaches **`gdb-multiarch`** to **`127.0.0.1:<listen port>`** (see [`examples/board_test_app/README.md`](examples/board_test_app/README.md) § *Visual debug*). Requires the **C/C++** extension (`ms-vscode.cpptools`).
 - Copy or source [`scripts/gdbinit.rsgdb.example`](scripts/gdbinit.rsgdb.example) when connecting GDB through rsgdb (adjust `target extended-remote` to your listen port).
 - Backend **thread-related** RSP replies (`m…` / `l` / `QC…` / hex thread names) get short summaries at **`rsgdb::rtos`** (debug); packets are unchanged on the wire.
 

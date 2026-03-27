@@ -2,61 +2,20 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "rsgdb: ensure release binary",
+      "label": "rsgdb: board_test_app (prepare for debug)",
       "type": "shell",
-      "command": "test -x \"${workspaceFolder}/target/release/rsgdb\" || cargo build --release",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "env": {}
-      },
-      "problemMatcher": [],
-      "group": "build"
-    },
-    {
-      "label": "board_test_app: make",
-      "type": "shell",
-      "command": "make",
-      "options": {
-        "cwd": "${workspaceFolder}/examples/board_test_app"
-      },
-      "problemMatcher": [],
-      "group": "build"
-    },
-    {
-      "label": "rsgdb: remote_ssh proxy",
-      "type": "shell",
-      "command": "\"${workspaceFolder}/examples/board_test_app/run_rsgdb_proxy.sh\"",
+      "command": "\"${workspaceFolder}/examples/board_test_app/prepare_cursor_debug.sh\"",
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "isBackground": true,
-      "problemMatcher": {
-        "owner": "rsgdb",
-        "pattern": {
-          "regexp": "^(.*)$",
-          "file": 1,
-          "location": 1,
-          "message": 1
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": ".",
-          "endsPattern": "Proxy server listening"
-        }
-      },
+      "problemMatcher": [],
       "presentation": {
-        "reveal": "silent",
-        "panel": "dedicated"
-      }
-    },
-    {
-      "label": "rsgdb: board_test_app (build + proxy)",
-      "dependsOn": [
-        "rsgdb: ensure release binary",
-        "board_test_app: make",
-        "rsgdb: remote_ssh proxy"
-      ],
-      "dependsOrder": "sequence"
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": false
+      },
+      "group": "build"
     }
   ]
 }

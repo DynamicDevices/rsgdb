@@ -13,7 +13,7 @@
       "miDebuggerPath": "gdb-multiarch",
       "miDebuggerServerAddress": "127.0.0.1:3333",
       "useExtendedRemote": true,
-      "preLaunchTask": "rsgdb: board_test_app (build + proxy)",
+      "preLaunchTask": "rsgdb: board_test_app (prepare for debug)",
       "setupCommands": [
         {
           "text": "set debuginfod enabled off",

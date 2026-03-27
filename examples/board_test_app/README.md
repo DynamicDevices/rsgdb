@@ -110,14 +110,15 @@ Use the **repository root** as the workspace folder so `${workspaceFolder}` reso
 1. Install the **C/C++** extension (`ms-vscode.cpptools`) — Cursor/VS Code may prompt from [`.vscode/extensions.json`](../../.vscode/extensions.json).
 2. Install **`gdb-multiarch`** on the host (e.g. `sudo apt install gdb-multiarch`).
 3. **SSH**: same as above — keys or `RSGDB_SSH_PASSWORD` for non-interactive `scp`/`ssh`. For password auth, start VS Code from a shell where `RSGDB_SSH_PASSWORD` is exported, or rely on SSH keys.
-4. **Run and Debug**: pick **`rsgdb: board_test_app (build, start proxy, debug)`** — it runs tasks that:
-   - build **`target/release/rsgdb`** if missing,
-   - **`make`** the example ELF,
-   - start **`rsgdb`** with [`rsgdb.remote.toml`](rsgdb.remote.toml) (waits until the proxy is listening on **127.0.0.1:3333**),
-   - then attaches **GDB** to that port with **`useExtendedRemote`** (same path as manual GDB).
-5. If **`rsgdb` is already running** (e.g. you started it in a terminal), use **`rsgdb: board_test_app (proxy already running)`** so the preLaunch task is not started twice.
+4. **Run and Debug** (sidebar): choose **`rsgdb: board_test_app (build, start proxy, debug)`** in the **dropdown** (not “No Configurations”), then press **F5** or **Start Debugging**. The preLaunch task runs [`prepare_cursor_debug.sh`](prepare_cursor_debug.sh): build **`rsgdb`** if needed, **`make`** the ELF, start **`rsgdb`** via [`run_rsgdb_proxy.sh`](run_rsgdb_proxy.sh), and **wait until TCP 127.0.0.1:3333** is listening (then **cppdbg** attaches with **`useExtendedRemote`**).
+5. If **`rsgdb` is already running**, use **`rsgdb: board_test_app (proxy already running)`** so the preLaunch task does not start a second proxy.
 
-**Troubleshooting:** If something else holds **3333/tcp**, stop it or change **`listen_port`** in `rsgdb.remote.toml` and **`miDebuggerServerAddress`** / **`preLaunchTask`** references in [`.vscode/launch.json`](../../.vscode/launch.json). Only **one** GDB client should use the proxy at a time.
+**If nothing happens or it hangs:**  
+- Install **C/C++** (`ms-vscode.cpptools`) and **reload** the window; without **`cppdbg`**, debug may not start.  
+- Watch the **Terminal** panel for the preLaunch task — you should see `==> rsgdb is listening...`. If you see an error, check **`/tmp/rsgdb-cursor-3333.log`**.  
+- Ensure the **launch configuration name** is selected in the Run and Debug dropdown (not empty).  
+- Port **3333** in use: stop the other process or change **`listen_port`** / **`RSGDB_PORT`** and [`.vscode/launch.json`](../../.vscode/launch.json) **`miDebuggerServerAddress`** to match.  
+- Only **one** GDB client at a time through the proxy.
 
 ### Manual gdbserver on target
 
