@@ -27,6 +27,7 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 💾 **Session recording (rsgdb-record v1)** — ordered RSP trace as JSON Lines (`.jsonl`)
 - 📝 **SVD annotation (read-only)** — CMSIS-SVD file → log labels for memory RSP (`m` / `M`) as `Peripheral.REGISTER` (`target: rsgdb::svd`, debug level)
 - ⚡ **`rsgdb flash`** — run a configured external flash tool (`[flash].program` with `{image}` substitution; OpenOCD/probe-rs/etc.)
+- 🧵 **RTOS RSP decode / log (Zephyr-first)** — thread-extension packets are decoded and logged at `target: rsgdb::rtos` (debug). Thread *data* comes from your stub (e.g. OpenOCD **Zephyr** RTOS awareness); other RTOSes use the same GDB RSP when the stub implements them (see below).
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), script `scripts/e2e_gdb_smoke.sh`; GitHub Actions job **E2E GDB smoke** (Ubuntu). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Planned
@@ -124,6 +125,17 @@ rsgdb flash --config rsgdb.toml build/zephyr/zephyr.signed.bin
 ```
 
 Stdin is closed; stdout/stderr are inherited so tool output appears in your terminal. Non-zero exit status is surfaced as an error.
+
+### RTOS awareness — which RTOS / how Zephyr fits in
+
+rsgdb does **not** ship RTOS kernels or flash algorithms. **Which threads exist and their names** are produced by the **GDB remote stub** (OpenOCD with an RTOS plugin, probe-rs, etc.) using GDB’s standard **thread-extension RSP**. The proxy stays transparent: it **forwards** packets and optionally **decodes/logs** them.
+
+| Area | What we claim |
+|------|----------------|
+| **Zephyr** | **Primary / reference workflow.** Use a stub that exposes Zephyr threads to GDB (e.g. OpenOCD’s Zephyr RTOS support). rsgdb logs `qC`, `qfThreadInfo` / `qsThreadInfo`, `Hg` / `Hc`, `qThreadExtraInfo`, `qXfer:threads`, and `T…thread:…` stop replies at **`rsgdb::rtos`**. |
+| **Other RTOSes** (FreeRTOS, ThreadX, …) | **Same RSP shapes** when your stub implements GDB thread extensions; rsgdb does not special-case them. If the stub does not expose threads, there is nothing for these packets to carry. |
+
+Enable thread-oriented logs with e.g. `RUST_LOG=rsgdb::rtos=debug,rsgdb=info` (or `-d` / config as for other targets). Session **recordings** (JSONL) already capture raw RSP for later correlation; richer “thread timeline” analysis is future work.
 
 ## 📖 Documentation
 

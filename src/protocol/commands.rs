@@ -65,6 +65,13 @@ pub enum GdbCommand {
     /// Detach (D)
     Detach,
 
+    /// Hg / Hc — set thread for subsequent operations (`Hg` = general / registers, `Hc` = continue)
+    SetThread {
+        /// `true` if `Hc…`, `false` if `Hg…`
+        for_continue: bool,
+        thread_id: u64,
+    },
+
     /// vCont - Continue with actions
     VCont(VContAction),
 
@@ -89,6 +96,9 @@ pub enum QueryCommand {
 
     /// qsThreadInfo - Subsequent thread info
     SubsequentThreadInfo,
+
+    /// qThreadExtraInfo — thread name / extra info for a thread id (hex-encoded id after `:`)
+    ThreadExtraInfo(String),
 
     /// qOffsets - Section offsets
     Offsets,
@@ -171,9 +181,38 @@ impl GdbCommand {
             b'z' => Self::parse_remove_breakpoint(&cmd_str[1..]),
             b'k' => Ok(GdbCommand::Kill),
             b'D' => Ok(GdbCommand::Detach),
+            b'H' => Self::parse_set_thread(&cmd_str[1..]),
             b'v' => Self::parse_v_command(&cmd_str[1..]),
             _ => Ok(GdbCommand::Unsupported(cmd_str.to_string())),
         }
+    }
+
+    fn parse_set_thread(data: &str) -> Result<Self, CommandError> {
+        let mut chars = data.chars();
+        let mode = chars
+            .next()
+            .ok_or_else(|| CommandError::InvalidFormat("H: missing g/c".to_string()))?;
+        let for_continue = match mode {
+            'g' => false,
+            'c' => true,
+            _ => {
+                return Err(CommandError::InvalidFormat(format!(
+                    "H: expected g or c, got {mode:?}"
+                )));
+            }
+        };
+        let rest: String = chars.collect();
+        if rest.is_empty() {
+            return Err(CommandError::InvalidFormat(
+                "H: missing thread id".to_string(),
+            ));
+        }
+        let thread_id =
+            u64::from_str_radix(&rest, 16).map_err(|_| CommandError::InvalidHex(rest.clone()))?;
+        Ok(GdbCommand::SetThread {
+            for_continue,
+            thread_id,
+        })
     }
 
     fn parse_query(data: &str) -> Result<Self, CommandError> {
@@ -192,6 +231,10 @@ impl GdbCommand {
             Ok(GdbCommand::Query(QueryCommand::FirstThreadInfo))
         } else if data == "sThreadInfo" {
             Ok(GdbCommand::Query(QueryCommand::SubsequentThreadInfo))
+        } else if let Some(id) = data.strip_prefix("ThreadExtraInfo:") {
+            Ok(GdbCommand::Query(QueryCommand::ThreadExtraInfo(
+                id.to_string(),
+            )))
         } else if data == "Offsets" {
             Ok(GdbCommand::Query(QueryCommand::Offsets))
         } else if data.starts_with("Symbol") {
@@ -375,6 +418,39 @@ mod tests {
     fn test_parse_continue() {
         let cmd = GdbCommand::parse(b"c").unwrap();
         assert!(matches!(cmd, GdbCommand::Continue { addr: None }));
+    }
+
+    #[test]
+    fn test_parse_set_thread_hc() {
+        let cmd = GdbCommand::parse(b"Hc2").unwrap();
+        assert!(matches!(
+            cmd,
+            GdbCommand::SetThread {
+                for_continue: true,
+                thread_id: 2
+            }
+        ));
+    }
+
+    #[test]
+    fn test_parse_set_thread_hg_id() {
+        let cmd = GdbCommand::parse(b"Hg1").unwrap();
+        assert!(matches!(
+            cmd,
+            GdbCommand::SetThread {
+                for_continue: false,
+                thread_id: 1
+            }
+        ));
+    }
+
+    #[test]
+    fn test_parse_thread_extra_info() {
+        let cmd = GdbCommand::parse(b"qThreadExtraInfo:1").unwrap();
+        match cmd {
+            GdbCommand::Query(QueryCommand::ThreadExtraInfo(id)) => assert_eq!(id, "1"),
+            _ => panic!("expected ThreadExtraInfo"),
+        }
     }
 }
 

@@ -5,8 +5,9 @@
 use crate::config::{ProxyConfig, RecordingConfig};
 use crate::error::RsgdbError;
 use crate::protocol::codec::{GdbCodec, PacketOrAck};
-use crate::protocol::commands::GdbCommand;
+use crate::protocol::commands::{GdbCommand, QueryCommand};
 use crate::recorder::{RecordDirection, RecordEventV1, SessionRecorder};
+use crate::rtos;
 use crate::svd::SvdIndex;
 use futures::StreamExt;
 use std::net::SocketAddr;
@@ -296,9 +297,93 @@ impl ProxySession {
         }
     }
 
+    /// Decode/log GDB thread-extension RSP (Zephyr, FreeRTOS, … — stub-dependent). `target: rsgdb::rtos`.
+    fn log_rtos_client_packet(&self, item: &PacketOrAck) {
+        let PacketOrAck::Packet(p) = item else {
+            return;
+        };
+        let Ok(cmd) = GdbCommand::parse(&p.data) else {
+            return;
+        };
+        match cmd {
+            GdbCommand::Query(QueryCommand::CurrentThread) => {
+                tracing::debug!(
+                    target: "rsgdb::rtos",
+                    direction = "client_to_backend",
+                    kind = "qC",
+                    "current thread query"
+                );
+            }
+            GdbCommand::Query(QueryCommand::FirstThreadInfo) => {
+                tracing::debug!(
+                    target: "rsgdb::rtos",
+                    direction = "client_to_backend",
+                    kind = "qfThreadInfo",
+                    "thread list (first)"
+                );
+            }
+            GdbCommand::Query(QueryCommand::SubsequentThreadInfo) => {
+                tracing::debug!(
+                    target: "rsgdb::rtos",
+                    direction = "client_to_backend",
+                    kind = "qsThreadInfo",
+                    "thread list (next)"
+                );
+            }
+            GdbCommand::Query(QueryCommand::ThreadExtraInfo(ref id)) => {
+                tracing::debug!(
+                    target: "rsgdb::rtos",
+                    direction = "client_to_backend",
+                    kind = "qThreadExtraInfo",
+                    thread_id_hex = %id,
+                    "thread name query"
+                );
+            }
+            GdbCommand::SetThread {
+                for_continue,
+                thread_id,
+            } => {
+                let op = if for_continue { "Hc" } else { "Hg" };
+                tracing::debug!(
+                    target: "rsgdb::rtos",
+                    direction = "client_to_backend",
+                    op,
+                    thread_id,
+                    "set thread"
+                );
+            }
+            GdbCommand::Query(QueryCommand::Other(ref s)) if s.starts_with("Xfer:threads") => {
+                tracing::debug!(
+                    target: "rsgdb::rtos",
+                    direction = "client_to_backend",
+                    kind = "qXfer:threads",
+                    "thread XML read"
+                );
+            }
+            _ => {}
+        }
+    }
+
+    fn log_rtos_backend_packet(&self, item: &PacketOrAck) {
+        let PacketOrAck::Packet(p) = item else {
+            return;
+        };
+        if p.data.first() == Some(&b'T') {
+            if let Some(note) = rtos::summarize_stop_reply(&p.data) {
+                tracing::debug!(
+                    target: "rsgdb::rtos",
+                    direction = "backend_to_client",
+                    summary = %note,
+                    "stop reply"
+                );
+            }
+        }
+    }
+
     /// Handle data received from the client
     async fn handle_client_data(&mut self, data: PacketOrAck) -> Result<(), RsgdbError> {
         self.log_svd_client_packet(&data);
+        self.log_rtos_client_packet(&data);
         self.record_trace(RecordDirection::ClientToBackend, &data)
             .await;
 
@@ -354,6 +439,7 @@ impl ProxySession {
     async fn handle_backend_data(&mut self, data: PacketOrAck) -> Result<(), RsgdbError> {
         self.record_trace(RecordDirection::BackendToClient, &data)
             .await;
+        self.log_rtos_backend_packet(&data);
 
         let mut stats = self.stats.lock().await;
 
