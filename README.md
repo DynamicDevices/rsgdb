@@ -1,6 +1,7 @@
 # rsgdb - Enhanced GDB Server/Proxy
 
 [![CI](https://github.com/DynamicDevices/rsgdb/workflows/CI/badge.svg)](https://github.com/DynamicDevices/rsgdb/actions)
+[![Zephyr E2E](https://github.com/DynamicDevices/rsgdb/workflows/Zephyr%20E2E/badge.svg)](https://github.com/DynamicDevices/rsgdb/actions/workflows/zephyr-e2e.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 [![Crates.io](https://img.shields.io/crates/v/rsgdb.svg)](https://crates.io/crates/rsgdb)
 
@@ -28,7 +29,7 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 📝 **SVD annotation (read-only)** — CMSIS-SVD file → log labels for memory RSP (`m` / `M`) as `Peripheral.REGISTER` (`target: rsgdb::svd`, debug level)
 - ⚡ **`rsgdb flash`** — run a configured external flash tool (`[flash].program` with `{image}` substitution; OpenOCD/probe-rs/etc.)
 - 🧵 **RTOS RSP decode / log (Zephyr-first)** — thread-extension packets are decoded and logged at `target: rsgdb::rtos` (debug). Thread *data* comes from your stub (e.g. OpenOCD **Zephyr** RTOS awareness); other RTOSes use the same GDB RSP when the stub implements them (see below).
-- 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), script `scripts/e2e_gdb_smoke.sh`; GitHub Actions job **E2E GDB smoke** (Ubuntu). See [CONTRIBUTING.md](CONTRIBUTING.md).
+- 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), `scripts/e2e_gdb_smoke.sh` (Ubuntu job in **CI** workflow). **Zephyr `native_sim`** E2E (`scripts/e2e_zephyr_native_sim.sh`) runs in the **Zephyr E2E** workflow when those scripts/app change, on `main`/`develop`, weekly, or manually. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - ✅ **Phase A (trust path)** — RSP codec matrix tests (`tests/rsp_codec_matrix.rs`, `scripts/e2e_rsp_regression.sh`), proxy TCP tests, ops matrix in README above.
 - 📎 **Phase B (GDB productivity)** — [`scripts/gdbinit.rsgdb.example`](scripts/gdbinit.rsgdb.example), `qSupported`-style proxy test, backend thread-reply summaries in `rsgdb::rtos` (decode/log only).
 
@@ -40,6 +41,15 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 🔌 Multiple backend support (probe-rs, OpenOCD)
 - 🖥️ Terminal UI (TUI) for interactive debugging
 - 📝 Richer SVD decoding (fields, enums) and correlation with recordings
+
+## Continuous integration
+
+| Workflow | What runs |
+|----------|-----------|
+| **CI** (`.github/workflows/ci.yml`) | `cargo fmt`, multi-OS `cargo test`, clippy, **E2E GDB smoke** (Ubuntu: `scripts/e2e_gdb_smoke.sh`), `cargo doc`, **tarpaulin** coverage (Codecov), release `cargo build` |
+| **Zephyr E2E** (`.github/workflows/zephyr-e2e.yml`) | West workspace + `native_sim` build, then same chain as local `RUN_E2E_ZEPHYR_NATIVE=1` (`scripts/e2e_zephyr_native_sim.sh`). Triggered by path filters, `main`/`develop` pushes, a weekly schedule, or **workflow_dispatch** |
+
+Both workflows support **workflow_dispatch** (run manually from the Actions tab).
 
 ## 🚀 Quick Start
 

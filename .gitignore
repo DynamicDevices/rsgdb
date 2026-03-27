@@ -44,3 +44,9 @@ rsgdb.local.toml
 tmp/
 temp/
 *.tmp
+
+# Local Zephyr west workspace (e.g. matching CI layout under the repo clone)
+.zephyr-workspace/
+
+# CI / local west venv (Zephyr E2E workflow)
+.venv-west/

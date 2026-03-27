@@ -1,0 +1,90 @@
+# End-to-end: west build (native_sim) → gdbserver → rsgdb → GDB batch.
+# Heavy (west update + first build); runs on path changes, main/develop pushes, schedule, and manual dispatch.
+name: Zephyr E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * 1"
+  push:
+    branches: [main, develop]
+    paths:
+      - ".github/workflows/zephyr-e2e.yml"
+      - "scripts/e2e_zephyr_native_sim.sh"
+      - "scripts/zephyr_multi_printf_app/**"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - ".github/workflows/zephyr-e2e.yml"
+      - "scripts/e2e_zephyr_native_sim.sh"
+      - "scripts/zephyr_multi_printf_app/**"
+
+concurrency:
+  group: zephyr-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  ZEPHYR_REF: v4.2.0
+  ZEPHYR_WORKSPACE: ${{ github.workspace }}/.zephyr-workspace
+
+jobs:
+  native-sim:
+    name: native_sim (gdbserver → rsgdb → gdb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host packages (Zephyr host + gdb stack)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc g++ gcc-multilib g++-multilib \
+            gdb gdbserver \
+            git cmake ninja-build gperf ccache \
+            python3-dev python3-pip python3-setuptools python3-wheel \
+            wget xz-utils file make \
+            device-tree-compiler \
+            libsdl2-dev
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install west (venv)
+        run: |
+          python3 -m venv .venv-west
+          ./.venv-west/bin/pip install -U pip
+          ./.venv-west/bin/pip install west
+          echo "${{ github.workspace }}/.venv-west/bin" >> "$GITHUB_PATH"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Zephyr west workspace
+        uses: actions/cache@v4
+        id: zephyr-cache
+        with:
+          path: .zephyr-workspace
+          key: zephyr-ws-${{ env.ZEPHYR_REF }}-${{ runner.os }}-v1
+
+      - name: West init and update
+        run: |
+          set -euo pipefail
+          west --version
+          WS="${{ env.ZEPHYR_WORKSPACE }}"
+          mkdir -p "$WS"
+          if [ ! -f "$WS/.west/config" ]; then
+            cd "$WS"
+            west init -m https://github.com/zephyrproject-rtos/zephyr --mr "${{ env.ZEPHYR_REF }}" .
+          else
+            cd "$WS"
+          fi
+          west update
+
+      - name: Build rsgdb (release)
+        run: cargo build --release --verbose
+
+      - name: Run Zephyr native_sim E2E
+        run: ./scripts/e2e_zephyr_native_sim.sh

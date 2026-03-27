@@ -98,6 +98,11 @@ First build can take several minutes. GDB is **host** `gdb` (not `arm-none-eabi-
 RUN_E2E_ZEPHYR_NATIVE=1 ./scripts/validate_local.sh
 ```
 
+### GitHub Actions (optional E2E parity)
+
+- **GDB smoke** — the **CI** workflow includes an Ubuntu job that runs `scripts/e2e_gdb_smoke.sh` after `cargo build --release` (same idea as `RUN_E2E_GDB=1` with `validate_local.sh`, without duplicating fmt/clippy/doc in that job).
+- **Zephyr `native_sim`** — the **Zephyr E2E** workflow (`.github/workflows/zephyr-e2e.yml`) provisions a cached west workspace, then runs `scripts/e2e_zephyr_native_sim.sh`. It runs when `scripts/e2e_zephyr_native_sim.sh` or `scripts/zephyr_multi_printf_app/` change, on pushes to `main`/`develop` for those paths, on a weekly schedule, and via **workflow_dispatch** (Actions → Zephyr E2E → Run workflow). This mirrors `RUN_E2E_ZEPHYR_NATIVE=1` locally without checking a Zephyr tree into this repo.
+
 ### Issue tracking
 
 Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issues). **Blocked-by** dependencies define order (e.g. Part A **#1 → #3**; **#2** can run in parallel). Close an issue from a PR with `Closes #N` when it is fully done.

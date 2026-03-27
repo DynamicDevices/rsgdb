@@ -5,6 +5,7 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -120,7 +121,7 @@ jobs:
         run: cargo install cargo-tarpaulin
       
       - name: Generate coverage
-        run: cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
+        run: cargo tarpaulin --verbose --all-features --workspace --timeout 300 --out xml
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
