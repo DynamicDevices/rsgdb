@@ -54,7 +54,7 @@ async fn setup_proxy_to_backend(backend_port: u16) -> (SocketAddr, JoinHandle<()
         timeout_secs: 5,
     };
 
-    let mut server = ProxyServer::new(proxy_cfg, RecordingConfig::default())
+    let mut server = ProxyServer::new(proxy_cfg, RecordingConfig::default(), None)
         .await
         .expect("proxy bind");
     let proxy_listen = server.local_addr().expect("proxy addr");

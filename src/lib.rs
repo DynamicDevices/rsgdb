@@ -32,10 +32,11 @@ pub mod protocol;
 pub mod proxy;
 pub mod recorder;
 pub mod state;
+pub mod svd;
 pub mod ui;
 
 // Re-export commonly used types
-pub use config::Config;
+pub use config::{Config, SvdConfig};
 pub use error::{Result, RsgdbError};
 pub use logging_setup::{init_from_logging_config, LoggingInitGuard};
 

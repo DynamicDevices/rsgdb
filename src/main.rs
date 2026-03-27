@@ -2,11 +2,14 @@
 //!
 //! Main entry point for the rsgdb application.
 
+use anyhow::Context;
 use clap::Parser;
 use rsgdb::config::Config;
 use rsgdb::proxy::ProxyServer;
+use rsgdb::svd::SvdIndex;
 use rsgdb::{init_from_logging_config, LoggingInitGuard};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tracing::{error, info};
 
 /// Command-line arguments
@@ -48,10 +51,14 @@ struct Args {
     /// Override recording output directory (implies recording if set)
     #[arg(long, value_name = "DIR")]
     record_dir: Option<PathBuf>,
+
+    /// CMSIS-SVD file path (peripheral/register labels for memory RSP in logs)
+    #[arg(long, value_name = "FILE")]
+    svd: Option<PathBuf>,
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let mut config = if let Some(config_path) = &args.config {
@@ -82,11 +89,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         config.recording.output_dir = dir.to_string_lossy().into_owned();
         config.recording.enabled = true;
     }
+    if let Some(svd) = &args.svd {
+        config.svd.path = Some(svd.to_string_lossy().into_owned());
+    }
 
     config.validate()?;
 
+    let svd_index: Option<Arc<SvdIndex>> = match config
+        .svd
+        .path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(path) => {
+            let idx = SvdIndex::load_from_path(Path::new(path))
+                .with_context(|| format!("loading SVD {}", path))?;
+            info!(
+                path = %path,
+                registers = idx.register_count(),
+                "Loaded CMSIS-SVD"
+            );
+            Some(Arc::new(idx))
+        }
+        None => None,
+    };
+
     let _log_guard: LoggingInitGuard =
-        init_from_logging_config(&config.logging, args.verbose, args.debug)?;
+        init_from_logging_config(&config.logging, args.verbose, args.debug)
+            .map_err(|e| anyhow::anyhow!("logging init: {}", e))?;
 
     info!("Starting rsgdb v{}", env!("CARGO_PKG_VERSION"));
     if let Some(config_path) = &args.config {
@@ -102,17 +133,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Configuration: {:?}", config);
 
-    let mut server = ProxyServer::new(config.proxy.clone(), config.recording.clone()).await?;
+    let mut server =
+        ProxyServer::new(config.proxy.clone(), config.recording.clone(), svd_index).await?;
 
     info!(
         listen = %server.local_addr()?,
         "Proxy server listening for GDB connections"
     );
 
-    if let Err(e) = server.run().await {
+    server.run().await.map_err(|e| {
         error!("Server error: {}", e);
-        return Err(e.into());
-    }
-
+        anyhow::anyhow!("{}", e)
+    })?;
     Ok(())
 }

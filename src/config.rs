@@ -28,6 +28,18 @@ pub struct Config {
     /// Session recording configuration
     #[serde(default)]
     pub recording: RecordingConfig,
+
+    /// CMSIS-SVD file for read-only peripheral/register annotation (memory RSP)
+    #[serde(default)]
+    pub svd: SvdConfig,
+}
+
+/// Optional CMSIS-SVD path. When set, memory `m`/`M` packets are annotated in logs (`target: rsgdb::svd`).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SvdConfig {
+    /// Path to `.svd` XML (device description)
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 /// Proxy server configuration
@@ -319,6 +331,16 @@ impl Config {
             });
         }
 
+        if let Some(ref p) = self.svd.path {
+            let p = p.trim();
+            if !p.is_empty() && !Path::new(p).exists() {
+                return Err(ConfigError::InvalidValue {
+                    field: "svd.path".to_string(),
+                    reason: "SVD file not found".to_string(),
+                });
+            }
+        }
+
         Ok(())
     }
 
@@ -359,6 +381,12 @@ impl Config {
         if let Ok(dir) = std::env::var("RSGDB_RECORD_DIR") {
             if !dir.is_empty() {
                 self.recording.output_dir = dir;
+            }
+        }
+
+        if let Ok(path) = std::env::var("RSGDB_SVD") {
+            if !path.trim().is_empty() {
+                self.svd.path = Some(path);
             }
         }
     }
@@ -407,6 +435,13 @@ mod tests {
         let mut config = Config::default();
         config.recording.enabled = true;
         config.recording.output_dir = "   ".to_string();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_svd_path_must_exist_when_set() {
+        let mut config = Config::default();
+        config.svd.path = Some("/nonexistent/absolute/path/device.svd".to_string());
         assert!(config.validate().is_err());
     }
 

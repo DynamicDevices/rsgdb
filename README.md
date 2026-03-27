@@ -25,6 +25,7 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 🚧 Structured logging infrastructure
 - 🚧 Configuration system
 - 💾 **Session recording (rsgdb-record v1)** — ordered RSP trace as JSON Lines (`.jsonl`)
+- 📝 **SVD annotation (read-only)** — CMSIS-SVD file → log labels for memory RSP (`m` / `M`) as `Peripheral.REGISTER` (`target: rsgdb::svd`, debug level)
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), script `scripts/e2e_gdb_smoke.sh`; GitHub Actions job **E2E GDB smoke** (Ubuntu). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Planned
@@ -34,7 +35,7 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 💾 Session **replay** tooling (mock backend / automated playback)
 - 🔌 Multiple backend support (probe-rs, OpenOCD)
 - 🖥️ Terminal UI (TUI) for interactive debugging
-- 📝 SVD-based peripheral register decoding
+- 📝 Richer SVD decoding (fields, enums) and correlation with recordings
 
 ## 🚀 Quick Start
 
@@ -84,7 +85,17 @@ max_hardware = 6
 enabled = false
 output_dir = "./recordings"
 max_size_mb = 100
+
+[svd]
+# Optional: path to CMSIS-SVD XML for memory access labels in logs
+path = "device.svd"
 ```
+
+### SVD labels (read-only)
+
+If `[svd] path` points to a valid CMSIS-SVD file (or use `--svd FILE` / env `RSGDB_SVD`), rsgdb builds a register map and emits **debug** logs for **client** memory packets (`m` read, `M` write) with a human-readable range when the access overlaps known registers — for example `GPIOA.MODER (4 bytes)`. This is **display only**; RSP bytes are unchanged.
+
+Enable the log target with e.g. `RUST_LOG=rsgdb::svd=debug,rsgdb=info` (or `-d` / verbose per your logging setup).
 
 ### Session recording (rsgdb-record v1)
 

@@ -5,7 +5,9 @@
 use crate::config::{ProxyConfig, RecordingConfig};
 use crate::error::RsgdbError;
 use crate::protocol::codec::{GdbCodec, PacketOrAck};
+use crate::protocol::commands::GdbCommand;
 use crate::recorder::{RecordDirection, RecordEventV1, SessionRecorder};
+use crate::svd::SvdIndex;
 use futures::StreamExt;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -20,12 +22,17 @@ use tracing::{debug, error, info, warn};
 pub struct ProxyServer {
     config: ProxyConfig,
     recording: RecordingConfig,
+    svd: Option<Arc<SvdIndex>>,
     listener: TcpListener,
 }
 
 impl ProxyServer {
     /// Create a new proxy server
-    pub async fn new(config: ProxyConfig, recording: RecordingConfig) -> Result<Self, RsgdbError> {
+    pub async fn new(
+        config: ProxyConfig,
+        recording: RecordingConfig,
+        svd: Option<Arc<SvdIndex>>,
+    ) -> Result<Self, RsgdbError> {
         let addr = format!("0.0.0.0:{}", config.listen_port);
         info!("Starting proxy server on {}", addr);
 
@@ -36,6 +43,7 @@ impl ProxyServer {
         Ok(Self {
             config,
             recording,
+            svd,
             listener,
         })
     }
@@ -53,10 +61,11 @@ impl ProxyServer {
                     info!("New connection from {}", addr);
                     let config = self.config.clone();
                     let recording = self.recording.clone();
+                    let svd = self.svd.clone();
 
                     // Spawn a new task to handle this connection
                     tokio::spawn(async move {
-                        if let Err(e) = handle_connection(socket, config, recording).await {
+                        if let Err(e) = handle_connection(socket, config, recording, svd).await {
                             error!("Connection error: {}", e);
                         }
                     });
@@ -74,6 +83,7 @@ async fn handle_connection(
     client_socket: TcpStream,
     config: ProxyConfig,
     recording: RecordingConfig,
+    svd: Option<Arc<SvdIndex>>,
 ) -> Result<(), RsgdbError> {
     let peer_addr = client_socket.peer_addr().map_err(RsgdbError::Io)?;
     info!("Handling connection from {}", peer_addr);
@@ -116,7 +126,7 @@ async fn handle_connection(
     };
 
     // Create a session to manage the connection
-    let mut session = ProxySession::new(client_socket, backend_socket, config, recorder);
+    let mut session = ProxySession::new(client_socket, backend_socket, config, recorder, svd);
 
     // Run the session
     session.run().await?;
@@ -132,6 +142,7 @@ struct ProxySession {
     config: ProxyConfig,
     stats: Arc<Mutex<SessionStats>>,
     recorder: Option<SessionRecorder>,
+    svd: Option<Arc<SvdIndex>>,
 }
 
 /// Statistics for a proxy session (ack/nack counts are total forwarded in either direction)
@@ -152,6 +163,7 @@ impl ProxySession {
         backend_socket: TcpStream,
         config: ProxyConfig,
         recorder: Option<SessionRecorder>,
+        svd: Option<Arc<SvdIndex>>,
     ) -> Self {
         let client = Framed::new(client_socket, GdbCodec::new());
         let backend = Framed::new(backend_socket, GdbCodec::new());
@@ -162,6 +174,7 @@ impl ProxySession {
             config,
             stats: Arc::new(Mutex::new(SessionStats::default())),
             recorder,
+            svd,
         }
     }
 
@@ -240,8 +253,52 @@ impl ProxySession {
         }
     }
 
+    /// Log SVD annotation for client memory RSP (`m` / `M`) when an index is configured.
+    fn log_svd_client_packet(&self, item: &PacketOrAck) {
+        let Some(ref idx) = self.svd else {
+            return;
+        };
+        let PacketOrAck::Packet(p) = item else {
+            return;
+        };
+        let Ok(cmd) = GdbCommand::parse(&p.data) else {
+            return;
+        };
+        match cmd {
+            GdbCommand::ReadMemory { addr, len } => {
+                if let Some(note) = idx.annotate_access(addr, len as u64) {
+                    tracing::debug!(
+                        target: "rsgdb::svd",
+                        direction = "client_to_backend",
+                        rsp = "m",
+                        addr = format!("0x{addr:x}"),
+                        len,
+                        %note,
+                        "memory read"
+                    );
+                }
+            }
+            GdbCommand::WriteMemory { addr, data } => {
+                let len = data.len() as u64;
+                if let Some(note) = idx.annotate_access(addr, len) {
+                    tracing::debug!(
+                        target: "rsgdb::svd",
+                        direction = "client_to_backend",
+                        rsp = "M",
+                        addr = format!("0x{addr:x}"),
+                        len,
+                        %note,
+                        "memory write"
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Handle data received from the client
     async fn handle_client_data(&mut self, data: PacketOrAck) -> Result<(), RsgdbError> {
+        self.log_svd_client_packet(&data);
         self.record_trace(RecordDirection::ClientToBackend, &data)
             .await;
 
@@ -386,7 +443,8 @@ mod tests {
             timeout_secs: 30,
         };
 
-        let result = ProxyServer::new(config, crate::config::RecordingConfig::default()).await;
+        let result =
+            ProxyServer::new(config, crate::config::RecordingConfig::default(), None).await;
         assert!(result.is_ok());
     }
 }
