@@ -107,9 +107,11 @@ RUN_E2E_ZEPHYR_NATIVE=1 ./scripts/validate_local.sh
 
 Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issues). **Blocked-by** dependencies define order (e.g. Part A **#1 → #3**; **#2** can run in parallel). Close an issue from a PR with `Closes #N` when it is fully done.
 
-**Status (short):** Part A (**#1–#3**), session recording (**#4**), SVD (**#5**), breakpoint/semihosting spike (**#6**), flash orchestration (**#7**) are closed. **RTOS awareness (#8):** pass-through + decode/log for thread RSP (`rsgdb::rtos`, Zephyr-first docs in README). **Automated checks:** `cargo test`, `tests/proxy_integration.rs`, `./scripts/validate_local.sh`, CI **E2E GDB smoke**. **Next:** **#9** (native probe backend).
+**Status (short):** Part A (**#1–#3**), session recording (**#4**), SVD baseline (**#5**), breakpoint/semihosting spike (**#6**), flash orchestration (**#7**), RTOS decode/log (**#8**) are **closed**. **Phase A/B** (RSP matrix + proxy tests, gdbinit, backend thread reply logging) are in-tree; see README. **CI:** main workflow (**CI**) + optional **Zephyr E2E** (`native_sim`, debug `rsgdb`, west venv + `pyelftools`) — both green on `main`.
 
-**CI jobs (overview):** `test` (matrix), `fmt`, `clippy`, `docs`, `e2e-gdb-smoke`, `coverage`, `build` (artifacts).
+**Next roadmap issues (open):** [#9](https://github.com/DynamicDevices/rsgdb/issues/9) native probe backend, [#10](https://github.com/DynamicDevices/rsgdb/issues/10) session replay from JSONL, [#11](https://github.com/DynamicDevices/rsgdb/issues/11) richer SVD (fields/enums).
+
+**CI jobs (overview):** Workflow **CI**: `test` (matrix), `fmt`, `clippy`, `docs`, `e2e-gdb-smoke`, `coverage`, `build` (artifacts; upload may use `continue-on-error` for transient infra). Workflow **Zephyr E2E**: west + SDK + `scripts/e2e_zephyr_native_sim.sh` (path / schedule / `workflow_dispatch`).
 
 **Design ADRs:** [docs/ADR-001-breakpoints-semihosting.md](docs/ADR-001-breakpoints-semihosting.md) — breakpoint policy + semihosting (Phase 2 spike).
 
@@ -322,26 +324,19 @@ rsgdb/
 
 ## Areas for Contribution
 
-We welcome contributions in these areas:
+We welcome contributions in these areas (see **[open issues](https://github.com/DynamicDevices/rsgdb/issues?q=is%3Aopen+is%3Aissue)** for current priorities):
 
-### High Priority
-- [ ] GDB RSP protocol implementation
-- [ ] Backend integrations (probe-rs, OpenOCD)
-- [ ] Breakpoint management system
-- [ ] State tracking and inspection
+### High priority (roadmap)
+- [ ] **Native probe / backend abstraction** — [#9](https://github.com/DynamicDevices/rsgdb/issues/9)
+- [ ] **Session replay from JSONL** — [#10](https://github.com/DynamicDevices/rsgdb/issues/10)
 
-### Medium Priority
-- [ ] Session recording/replay
-- [ ] TUI interface
-- [ ] SVD peripheral decoding
-- [ ] Performance optimizations
+### Medium priority
+- [ ] **Richer SVD (fields, enums)** — [#11](https://github.com/DynamicDevices/rsgdb/issues/11)
+- [ ] TUI, advanced breakpoints, logging export — open an issue before large changes
 
-### Always Welcome
-- Documentation improvements
-- Test coverage expansion
-- Bug fixes
-- Example code
-- Performance improvements
+### Always welcome
+- Documentation and test coverage (RSP matrix, proxy integration, SVD fixtures)
+- Bug fixes and small ergonomics (gdbinit, logging targets)
 
 ## Getting Help
 

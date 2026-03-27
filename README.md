@@ -148,7 +148,7 @@ When enabled, each GDB↔backend connection writes one **JSON Lines** file under
 
 **Enable:** `rsgdb --record`, or set `[recording] enabled = true` in config, or `RSGDB_RECORD=1`. Optional directory override: `--record-dir DIR` or `RSGDB_RECORD_DIR`.
 
-**Replay:** There is no built-in replayer yet. Inspect `.jsonl` with your usual tools or `jq`; a future release may add a mock server for automated replay.
+**Replay:** There is no built-in replayer yet. Inspect `.jsonl` with your usual tools or `jq`. Work is tracked as [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (mock / automated playback for regression tests).
 
 ### Flash orchestration (`rsgdb flash`)
 
@@ -285,29 +285,19 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## 📋 Roadmap
 
-### v0.1.0 - Foundation (Current)
-- [x] Project setup and structure
-- [ ] Basic RSP protocol parser
-- [ ] Simple pass-through proxy
-- [ ] Configuration system
-- [ ] Basic logging
+Source of truth for ordering and scope: **[GitHub Issues](https://github.com/DynamicDevices/rsgdb/issues)** (labels `roadmap`, `enhancement`).
 
-### v0.2.0 - Core Features
-- [ ] Enhanced logging with filtering
-- [ ] Breakpoint management
-- [ ] State tracking
-- [ ] Memory inspection
+| Milestone (docs) | What it means | Issue |
+|------------------|---------------|-------|
+| **Foundation + proxy** | RSP codec, TCP proxy, config, logging, CI (incl. GDB + Zephyr E2E), session record (JSONL), SVD labels, flash orchestration, RTOS decode/log | Closed: [#1–#8](https://github.com/DynamicDevices/rsgdb/issues?q=is%3Aissue+is%3Aclosed) |
+| **Next: native backend** | Probe-facing `Backend` (not only TCP stub) | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (open) |
+| **Next: replay** | Playback / mock backend from `.jsonl` recordings | [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (open) |
+| **Next: richer SVD** | Fields, enums, correlation with recordings | [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (open) |
 
-### v0.3.0 - Backend Support
-- [ ] probe-rs integration
-- [ ] OpenOCD support
-- [ ] Backend abstraction layer
+Older versioned bullets (v0.2–v0.4) below are **aspirational**; issue titles supersede them.
 
-### v0.4.0 - Advanced Features
-- [ ] Session recording/replay
-- [ ] TUI interface
-- [ ] SVD peripheral decoding
-- [ ] Performance optimizations
+### Aspirational (not scheduled per-issue yet)
+- Enhanced logging export (JSON/CSV), advanced breakpoints, TUI, performance work — see **Planned** under Key Features and open an issue when starting.
 
 ## 📄 License
 
@@ -331,4 +321,4 @@ You may choose either license for your use.
 
 ---
 
-**Status**: 🚧 Early Development - Not yet ready for production use
+**Status**: 🚧 Early development — CI green on `main` (multi-OS tests, GDB smoke, Zephyr `native_sim` E2E). Not a substitute for a production-qualified probe stack until native backends and release hardening land; see issues above.
