@@ -50,8 +50,10 @@ enable_named = true
 enable_conditional = true
 
 [backend]
-# Backend type: openocd, probe-rs, pyocd
+# Label for logs / tooling (openocd, probe-rs, gdbserver, …)
 backend_type = "openocd"
+# How to reach the target: tcp = GDB stub on proxy.target_host:target_port; native = reserved (#9)
+transport = "tcp"
 
 # Backend-specific options
 [backend.options]

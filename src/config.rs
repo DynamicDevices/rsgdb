@@ -125,12 +125,54 @@ pub struct BreakpointConfig {
     pub enable_conditional: bool,
 }
 
+/// How the proxy reaches the debug target (stub TCP vs future native probe).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum BackendTransport {
+    /// GDB remote stub on `proxy.target_host`:`proxy.target_port` (OpenOCD, probe-rs GDB port, …).
+    #[default]
+    #[serde(alias = "stub")]
+    Tcp,
+    /// Direct probe / native integration (not implemented; reserved for #9).
+    Native,
+}
+
+impl BackendTransport {
+    /// Parse from config strings (`tcp`, `stub`, `native`).
+    pub fn parse(s: &str) -> ConfigResult<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "tcp" | "stub" => Ok(Self::Tcp),
+            "native" => Ok(Self::Native),
+            "" => Err(ConfigError::InvalidValue {
+                field: "backend.transport".to_string(),
+                reason: "Cannot be empty".to_string(),
+            }),
+            other => Err(ConfigError::InvalidValue {
+                field: "backend.transport".to_string(),
+                reason: format!("Must be tcp or native, got: {other}"),
+            }),
+        }
+    }
+}
+
+impl std::str::FromStr for BackendTransport {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s).map_err(|e| e.to_string())
+    }
+}
+
 /// Backend configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackendConfig {
-    /// Backend type (openocd, probe-rs, pyocd)
+    /// Label for the stub or tool (openocd, probe-rs, pyocd, …) — logging / future use only.
     #[serde(default = "default_backend_type")]
     pub backend_type: String,
+
+    /// Transport to the target (`tcp` = remote stub; `native` reserved).
+    #[serde(default)]
+    pub transport: BackendTransport,
 
     /// Backend-specific options
     #[serde(default)]
@@ -235,6 +277,7 @@ impl Default for BackendConfig {
     fn default() -> Self {
         Self {
             backend_type: default_backend_type(),
+            transport: BackendTransport::default(),
             options: std::collections::HashMap::new(),
         }
     }
@@ -326,12 +369,11 @@ impl Config {
             });
         }
 
-        // Validate backend config
-        let valid_backends = ["openocd", "probe-rs", "pyocd"];
-        if !valid_backends.contains(&self.backend.backend_type.as_str()) {
+        // Backend label is free-form (openocd, probe-rs, custom); must not be empty.
+        if self.backend.backend_type.trim().is_empty() {
             return Err(ConfigError::InvalidValue {
                 field: "backend.backend_type".to_string(),
-                reason: format!("Must be one of: {}", valid_backends.join(", ")),
+                reason: "Cannot be empty".to_string(),
             });
         }
 
@@ -380,6 +422,12 @@ impl Config {
 
         if let Ok(backend) = std::env::var("RSGDB_BACKEND") {
             self.backend.backend_type = backend;
+        }
+
+        if let Ok(t) = std::env::var("RSGDB_TRANSPORT") {
+            if let Ok(tr) = BackendTransport::parse(&t) {
+                self.backend.transport = tr;
+            }
         }
 
         if let Ok(v) = std::env::var("RSGDB_RECORD") {

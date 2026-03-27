@@ -4,7 +4,7 @@
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use rsgdb::config::Config;
+use rsgdb::config::{BackendTransport, Config};
 use rsgdb::flash;
 use rsgdb::proxy::ProxyServer;
 use rsgdb::svd::SvdIndex;
@@ -92,6 +92,10 @@ struct ProxyArgs {
     /// CMSIS-SVD file path (peripheral/register labels for memory RSP in logs)
     #[arg(long, value_name = "FILE")]
     svd: Option<PathBuf>,
+
+    /// Backend transport: `tcp` (GDB stub on target_host:target_port) or `native` (not implemented)
+    #[arg(long, value_name = "tcp|native")]
+    transport: Option<String>,
 }
 
 #[tokio::main]
@@ -195,6 +199,10 @@ async fn run_proxy(args: ProxyArgs) -> anyhow::Result<()> {
     if let Some(backend) = args.backend {
         config.backend.backend_type = backend;
     }
+    if let Some(ref t) = args.transport {
+        config.backend.transport =
+            BackendTransport::parse(t).map_err(|e| anyhow::anyhow!("{}", e))?;
+    }
 
     if args.record {
         config.recording.enabled = true;
@@ -242,13 +250,19 @@ async fn run_proxy(args: ProxyArgs) -> anyhow::Result<()> {
 
     info!(
         backend_type = %config.backend.backend_type,
-        "Configured debug backend (for future integration)"
+        transport = ?config.backend.transport,
+        "Configured debug backend"
     );
 
     info!("Configuration: {:?}", config);
 
-    let mut server =
-        ProxyServer::new(config.proxy.clone(), config.recording.clone(), svd_index).await?;
+    let mut server = ProxyServer::new(
+        config.proxy.clone(),
+        config.backend.clone(),
+        config.recording.clone(),
+        svd_index,
+    )
+    .await?;
 
     info!(
         listen = %server.local_addr()?,

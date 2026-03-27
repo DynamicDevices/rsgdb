@@ -37,12 +37,12 @@ pub mod scaffold;
 pub mod svd;
 
 // Stable names for scaffold submodules (see `scaffold` module docs).
-pub use scaffold::breakpoints;
-pub use scaffold::state;
-pub use scaffold::ui;
+pub use scaffold::{breakpoints, state, ui};
+
+pub use crate::backends::connect_backend;
 
 // Re-export commonly used types
-pub use config::{Config, FlashConfig, SvdConfig};
+pub use config::{BackendConfig, BackendTransport, Config, FlashConfig, SvdConfig};
 pub use error::{Result, RsgdbError};
 pub use logging_setup::{init_from_logging_config, LoggingInitGuard};
 

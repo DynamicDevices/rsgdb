@@ -1,7 +1,7 @@
 //! Integration: mock replay backend + proxy + client (issue #10).
 
 use futures::{SinkExt, StreamExt};
-use rsgdb::config::{ProxyConfig, RecordingConfig};
+use rsgdb::config::{BackendConfig, ProxyConfig, RecordingConfig};
 use rsgdb::protocol::codec::{GdbCodec, PacketOrAck};
 use rsgdb::protocol::Packet;
 use rsgdb::proxy::ProxyServer;
@@ -54,6 +54,7 @@ async fn replay_mock_backend_round_trip_through_proxy() {
             enable_acks: true,
             timeout_secs: 30,
         },
+        BackendConfig::default(),
         RecordingConfig::default(),
         None,
     )

@@ -117,8 +117,10 @@ target_host = "localhost"
 target_port = 3334
 
 [backend]
-# Used for logging / future integration; the proxy connects over TCP to target_host:target_port
+# Label for logs (openocd, probe-rs, gdbserver, …)
 backend_type = "openocd"
+# tcp = GDB stub on target_host:target_port; native = reserved (see GitHub #9)
+transport = "tcp"
 
 [logging]
 level = "debug"
@@ -294,7 +296,7 @@ Source of truth for ordering and scope: **[GitHub Issues](https://github.com/Dyn
 | Milestone (docs) | What it means | Issue |
 |------------------|---------------|-------|
 | **Foundation + proxy** | RSP codec, TCP proxy, config, logging, CI (incl. GDB + Zephyr E2E), session record (JSONL), SVD labels, flash orchestration, RTOS decode/log | Closed: [#1–#8](https://github.com/DynamicDevices/rsgdb/issues?q=is%3Aissue+is%3Aclosed) |
-| **Next: native backend** | Probe-facing backend beyond TCP to a stub (see `backends::connect_tcp_backend`) | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (open) |
+| **Next: native backend** | Implement `BackendTransport::Native`; default `transport = "tcp"` → `connect_backend` (`src/backends/mod.rs`) | [#9](https://github.com/DynamicDevices/rsgdb/issues/9) (open) |
 | **Replay** | `rsgdb replay` + mock TCP backend from `.jsonl` | [#10](https://github.com/DynamicDevices/rsgdb/issues/10) (closed) |
 | **Richer SVD** | Overlapping fields + enum variant names in annotations; value decode / recording correlation follow-ups | [#11](https://github.com/DynamicDevices/rsgdb/issues/11) (baseline closed; follow-ups optional) |
 

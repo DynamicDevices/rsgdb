@@ -2,8 +2,9 @@
 //!
 //! Handles incoming GDB client connections and forwards commands to the backend.
 
-use crate::backends::connect_tcp_backend;
-use crate::config::{ProxyConfig, RecordingConfig};
+use crate::backends::connect_backend;
+use crate::backends::BackendStream;
+use crate::config::{BackendConfig, ProxyConfig, RecordingConfig};
 use crate::error::RsgdbError;
 use crate::protocol::codec::{GdbCodec, PacketOrAck};
 use crate::protocol::commands::{GdbCommand, QueryCommand};
@@ -21,6 +22,7 @@ use tracing::{debug, error, info, warn};
 /// Proxy server that bridges GDB clients and debug backends
 pub struct ProxyServer {
     config: ProxyConfig,
+    backend: BackendConfig,
     recording: RecordingConfig,
     svd: Option<Arc<SvdIndex>>,
     listener: TcpListener,
@@ -30,6 +32,7 @@ impl ProxyServer {
     /// Create a new proxy server
     pub async fn new(
         config: ProxyConfig,
+        backend: BackendConfig,
         recording: RecordingConfig,
         svd: Option<Arc<SvdIndex>>,
     ) -> Result<Self, RsgdbError> {
@@ -42,6 +45,7 @@ impl ProxyServer {
 
         Ok(Self {
             config,
+            backend,
             recording,
             svd,
             listener,
@@ -60,12 +64,15 @@ impl ProxyServer {
                 Ok((socket, addr)) => {
                     info!("New connection from {}", addr);
                     let config = self.config.clone();
+                    let backend = self.backend.clone();
                     let recording = self.recording.clone();
                     let svd = self.svd.clone();
 
                     // Spawn a new task to handle this connection
                     tokio::spawn(async move {
-                        if let Err(e) = handle_connection(socket, config, recording, svd).await {
+                        if let Err(e) =
+                            handle_connection(socket, config, backend, recording, svd).await
+                        {
                             error!("Connection error: {}", e);
                         }
                     });
@@ -82,6 +89,7 @@ impl ProxyServer {
 async fn handle_connection(
     client_socket: TcpStream,
     config: ProxyConfig,
+    backend_cfg: BackendConfig,
     recording: RecordingConfig,
     svd: Option<Arc<SvdIndex>>,
 ) -> Result<(), RsgdbError> {
@@ -89,9 +97,12 @@ async fn handle_connection(
     info!("Handling connection from {}", peer_addr);
 
     let backend_addr = format!("{}:{}", config.target_host, config.target_port);
-    debug!("Connecting to backend at {}", backend_addr);
+    debug!(
+        "Connecting to backend at {} (transport={:?}, label={})",
+        backend_addr, backend_cfg.transport, backend_cfg.backend_type
+    );
 
-    let backend = connect_tcp_backend(&config).await?;
+    let backend = connect_backend(&config, &backend_cfg).await?;
 
     info!("Connected to backend at {}", backend_addr);
 
@@ -120,7 +131,7 @@ async fn handle_connection(
 /// A proxy session managing a single client-backend connection pair
 struct ProxySession {
     client: Framed<TcpStream, GdbCodec>,
-    backend: Framed<TcpStream, GdbCodec>,
+    backend: Framed<BackendStream, GdbCodec>,
     config: ProxyConfig,
     stats: Arc<Mutex<SessionStats>>,
     recorder: Option<SessionRecorder>,
@@ -142,7 +153,7 @@ impl ProxySession {
     /// Create a new proxy session
     fn new(
         client_socket: TcpStream,
-        backend: Framed<TcpStream, GdbCodec>,
+        backend: Framed<BackendStream, GdbCodec>,
         config: ProxyConfig,
         recorder: Option<SessionRecorder>,
         svd: Option<Arc<SvdIndex>>,
@@ -516,8 +527,13 @@ mod tests {
             timeout_secs: 30,
         };
 
-        let result =
-            ProxyServer::new(config, crate::config::RecordingConfig::default(), None).await;
+        let result = ProxyServer::new(
+            config,
+            crate::config::BackendConfig::default(),
+            crate::config::RecordingConfig::default(),
+            None,
+        )
+        .await;
         assert!(result.is_ok());
     }
 }
