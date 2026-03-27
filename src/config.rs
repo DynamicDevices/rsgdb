@@ -312,6 +312,13 @@ impl Config {
             });
         }
 
+        if self.recording.enabled && self.recording.output_dir.trim().is_empty() {
+            return Err(ConfigError::InvalidValue {
+                field: "recording.output_dir".to_string(),
+                reason: "Cannot be empty when recording is enabled".to_string(),
+            });
+        }
+
         Ok(())
     }
 
@@ -340,6 +347,19 @@ impl Config {
 
         if let Ok(backend) = std::env::var("RSGDB_BACKEND") {
             self.backend.backend_type = backend;
+        }
+
+        if let Ok(v) = std::env::var("RSGDB_RECORD") {
+            let v = v.trim();
+            if v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes") {
+                self.recording.enabled = true;
+            }
+        }
+
+        if let Ok(dir) = std::env::var("RSGDB_RECORD_DIR") {
+            if !dir.is_empty() {
+                self.recording.output_dir = dir;
+            }
         }
     }
 }
@@ -379,6 +399,14 @@ mod tests {
     fn test_invalid_log_level() {
         let mut config = Config::default();
         config.logging.level = "invalid".to_string();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_recording_requires_output_dir_when_enabled() {
+        let mut config = Config::default();
+        config.recording.enabled = true;
+        config.recording.output_dir = "   ".to_string();
         assert!(config.validate().is_err());
     }
 

@@ -35,6 +35,10 @@ pub enum RsgdbError {
     #[error("Operation timed out: {0}")]
     Timeout(String),
 
+    /// JSON serialization / deserialization
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+
     /// State errors
     #[error("Invalid state: {0}")]
     InvalidState(String),

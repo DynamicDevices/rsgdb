@@ -1,37 +1,8 @@
-//! Recorder module
-//!
-//! Session recording and replay functionality.
+//! Session recording (ordered RSP trace as **rsgdb-record** JSON Lines).
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+mod jsonl;
 
-/// Represents a recorded debugging session
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Session {
-    /// Session ID
-    pub id: String,
-
-    /// Start time
-    pub start_time: DateTime<Utc>,
-
-    /// End time
-    pub end_time: Option<DateTime<Utc>>,
-
-    /// Recorded events
-    pub events: Vec<SessionEvent>,
-}
-
-/// Represents an event in a debugging session
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionEvent {
-    /// Timestamp
-    pub timestamp: DateTime<Utc>,
-
-    /// Event type
-    pub event_type: String,
-
-    /// Event data
-    pub data: Vec<u8>,
-}
-
-// Made with Bob
+pub use jsonl::{
+    RecordDirection, RecordEventV1, RecordHeaderV1, RecordKind, SessionRecorder, FORMAT_NAME,
+    FORMAT_VERSION,
+};

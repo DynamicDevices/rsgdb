@@ -24,12 +24,13 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 🚧 Basic proxy/pass-through mode
 - 🚧 Structured logging infrastructure
 - 🚧 Configuration system
+- 💾 **Session recording (rsgdb-record v1)** — ordered RSP trace as JSON Lines (`.jsonl`)
 
 ### Planned
 - 📊 Enhanced logging with filtering and export (JSON, CSV)
 - 🎯 Advanced breakpoint management (named, conditional, grouped)
 - 🔍 State tracking and visualization
-- 💾 Session recording and replay
+- 💾 Session **replay** tooling (mock backend / automated playback)
 - 🔌 Multiple backend support (probe-rs, OpenOCD)
 - 🖥️ Terminal UI (TUI) for interactive debugging
 - 📝 SVD-based peripheral register decoding
@@ -77,7 +78,20 @@ output = "rsgdb.log"
 [breakpoints]
 auto_optimize = true
 max_hardware = 6
+
+[recording]
+enabled = false
+output_dir = "./recordings"
+max_size_mb = 100
 ```
+
+### Session recording (rsgdb-record v1)
+
+When enabled, each GDB↔backend connection writes one **JSON Lines** file under `recording.output_dir`. Line 1 is a header (`format`, `version`, `session_id`, `started_at`). Later lines are RSP events: `direction` (`client_to_backend` / `backend_to_client`), `kind` (`packet` / `ack` / `nack`), and for packets `payload_hex` / `payload_len` (hex is the raw packet payload bytes, not the `$…#xx` framing).
+
+**Enable:** `rsgdb --record`, or set `[recording] enabled = true` in config, or `RSGDB_RECORD=1`. Optional directory override: `--record-dir DIR` or `RSGDB_RECORD_DIR`.
+
+**Replay:** There is no built-in replayer yet. Inspect `.jsonl` with your usual tools or `jq`; a future release may add a mock server for automated replay.
 
 ## 📖 Documentation
 

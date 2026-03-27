@@ -2,9 +2,11 @@
 //!
 //! Handles incoming GDB client connections and forwards commands to the backend.
 
-use crate::config::ProxyConfig;
+use crate::config::{ProxyConfig, RecordingConfig};
 use crate::error::RsgdbError;
 use crate::protocol::codec::{GdbCodec, PacketOrAck};
+use crate::recorder::{RecordDirection, RecordEventV1, SessionRecorder};
+use futures::StreamExt;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,12 +19,13 @@ use tracing::{debug, error, info, warn};
 /// Proxy server that bridges GDB clients and debug backends
 pub struct ProxyServer {
     config: ProxyConfig,
+    recording: RecordingConfig,
     listener: TcpListener,
 }
 
 impl ProxyServer {
     /// Create a new proxy server
-    pub async fn new(config: ProxyConfig) -> Result<Self, RsgdbError> {
+    pub async fn new(config: ProxyConfig, recording: RecordingConfig) -> Result<Self, RsgdbError> {
         let addr = format!("0.0.0.0:{}", config.listen_port);
         info!("Starting proxy server on {}", addr);
 
@@ -30,7 +33,11 @@ impl ProxyServer {
 
         info!("Proxy server listening on {}", addr);
 
-        Ok(Self { config, listener })
+        Ok(Self {
+            config,
+            recording,
+            listener,
+        })
     }
 
     /// Local socket address this server is bound to (useful when `listen_port` is `0`).
@@ -45,10 +52,11 @@ impl ProxyServer {
                 Ok((socket, addr)) => {
                     info!("New connection from {}", addr);
                     let config = self.config.clone();
+                    let recording = self.recording.clone();
 
                     // Spawn a new task to handle this connection
                     tokio::spawn(async move {
-                        if let Err(e) = handle_connection(socket, config).await {
+                        if let Err(e) = handle_connection(socket, config, recording).await {
                             error!("Connection error: {}", e);
                         }
                     });
@@ -65,6 +73,7 @@ impl ProxyServer {
 async fn handle_connection(
     client_socket: TcpStream,
     config: ProxyConfig,
+    recording: RecordingConfig,
 ) -> Result<(), RsgdbError> {
     let peer_addr = client_socket.peer_addr().map_err(RsgdbError::Io)?;
     info!("Handling connection from {}", peer_addr);
@@ -94,8 +103,20 @@ async fn handle_connection(
 
     info!("Connected to backend at {}", backend_addr);
 
+    let recorder = if recording.enabled {
+        match SessionRecorder::create(&recording).await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                error!("Failed to start session recording: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Create a session to manage the connection
-    let mut session = ProxySession::new(client_socket, backend_socket, config);
+    let mut session = ProxySession::new(client_socket, backend_socket, config, recorder);
 
     // Run the session
     session.run().await?;
@@ -110,6 +131,7 @@ struct ProxySession {
     backend: Framed<TcpStream, GdbCodec>,
     config: ProxyConfig,
     stats: Arc<Mutex<SessionStats>>,
+    recorder: Option<SessionRecorder>,
 }
 
 /// Statistics for a proxy session (ack/nack counts are total forwarded in either direction)
@@ -125,7 +147,12 @@ struct SessionStats {
 
 impl ProxySession {
     /// Create a new proxy session
-    fn new(client_socket: TcpStream, backend_socket: TcpStream, config: ProxyConfig) -> Self {
+    fn new(
+        client_socket: TcpStream,
+        backend_socket: TcpStream,
+        config: ProxyConfig,
+        recorder: Option<SessionRecorder>,
+    ) -> Self {
         let client = Framed::new(client_socket, GdbCodec::new());
         let backend = Framed::new(backend_socket, GdbCodec::new());
 
@@ -134,13 +161,26 @@ impl ProxySession {
             backend,
             config,
             stats: Arc::new(Mutex::new(SessionStats::default())),
+            recorder,
+        }
+    }
+
+    async fn flush_recording(&mut self) {
+        if let Some(ref mut r) = self.recorder {
+            if let Err(e) = r.flush().await {
+                error!("recording flush failed: {}", e);
+            }
         }
     }
 
     /// Run the proxy session
     async fn run(&mut self) -> Result<(), RsgdbError> {
-        use futures::StreamExt;
+        let res = self.run_inner().await;
+        self.flush_recording().await;
+        res
+    }
 
+    async fn run_inner(&mut self) -> Result<(), RsgdbError> {
         debug!(
             "Session settings: enable_acks={}, timeout_secs={}",
             self.config.enable_acks, self.config.timeout_secs
@@ -191,8 +231,20 @@ impl ProxySession {
         }
     }
 
+    async fn record_trace(&mut self, direction: RecordDirection, item: &PacketOrAck) {
+        if let Some(ref mut r) = self.recorder {
+            let ev = RecordEventV1::from_rsp(direction, item);
+            if let Err(e) = r.record(&ev).await {
+                error!("recording write failed: {}", e);
+            }
+        }
+    }
+
     /// Handle data received from the client
     async fn handle_client_data(&mut self, data: PacketOrAck) -> Result<(), RsgdbError> {
+        self.record_trace(RecordDirection::ClientToBackend, &data)
+            .await;
+
         let mut stats = self.stats.lock().await;
 
         match data {
@@ -243,6 +295,9 @@ impl ProxySession {
 
     /// Handle data received from the backend
     async fn handle_backend_data(&mut self, data: PacketOrAck) -> Result<(), RsgdbError> {
+        self.record_trace(RecordDirection::BackendToClient, &data)
+            .await;
+
         let mut stats = self.stats.lock().await;
 
         match data {
@@ -331,7 +386,7 @@ mod tests {
             timeout_secs: 30,
         };
 
-        let result = ProxyServer::new(config).await;
+        let result = ProxyServer::new(config, crate::config::RecordingConfig::default()).await;
         assert!(result.is_ok());
     }
 }

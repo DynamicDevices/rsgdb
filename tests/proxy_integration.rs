@@ -3,7 +3,7 @@
 //! These tests do **not** require a `gdb` binary; they exercise the same RSP framing GDB uses.
 
 use futures::{SinkExt, StreamExt};
-use rsgdb::config::ProxyConfig;
+use rsgdb::config::{ProxyConfig, RecordingConfig};
 use rsgdb::protocol::codec::{GdbCodec, PacketOrAck};
 use rsgdb::protocol::Packet;
 use rsgdb::proxy::ProxyServer;
@@ -54,7 +54,9 @@ async fn setup_proxy_to_backend(backend_port: u16) -> (SocketAddr, JoinHandle<()
         timeout_secs: 5,
     };
 
-    let mut server = ProxyServer::new(proxy_cfg).await.expect("proxy bind");
+    let mut server = ProxyServer::new(proxy_cfg, RecordingConfig::default())
+        .await
+        .expect("proxy bind");
     let proxy_listen = server.local_addr().expect("proxy addr");
 
     let run = tokio::spawn(async move {

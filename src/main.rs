@@ -40,6 +40,14 @@ struct Args {
     /// Enable debug logging
     #[arg(short, long)]
     debug: bool,
+
+    /// Record RSP traffic to JSONL (rsgdb-record v1) under `recording.output_dir`
+    #[arg(long)]
+    record: bool,
+
+    /// Override recording output directory (implies recording if set)
+    #[arg(long, value_name = "DIR")]
+    record_dir: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -67,6 +75,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         config.backend.backend_type = backend;
     }
 
+    if args.record {
+        config.recording.enabled = true;
+    }
+    if let Some(dir) = args.record_dir {
+        config.recording.output_dir = dir.to_string_lossy().into_owned();
+        config.recording.enabled = true;
+    }
+
     config.validate()?;
 
     let _log_guard: LoggingInitGuard =
@@ -86,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Configuration: {:?}", config);
 
-    let mut server = ProxyServer::new(config.proxy).await?;
+    let mut server = ProxyServer::new(config.proxy.clone(), config.recording.clone()).await?;
 
     info!(
         listen = %server.local_addr()?,
