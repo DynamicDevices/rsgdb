@@ -29,6 +29,7 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - ⚡ **`rsgdb flash`** — run a configured external flash tool (`[flash].program` with `{image}` substitution; OpenOCD/probe-rs/etc.)
 - 🧵 **RTOS RSP decode / log (Zephyr-first)** — thread-extension packets are decoded and logged at `target: rsgdb::rtos` (debug). Thread *data* comes from your stub (e.g. OpenOCD **Zephyr** RTOS awareness); other RTOSes use the same GDB RSP when the stub implements them (see below).
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), script `scripts/e2e_gdb_smoke.sh`; GitHub Actions job **E2E GDB smoke** (Ubuntu). See [CONTRIBUTING.md](CONTRIBUTING.md).
+- ✅ **Phase A (trust path)** — RSP codec matrix tests (`tests/rsp_codec_matrix.rs`, `scripts/e2e_rsp_regression.sh`), proxy TCP tests, ops matrix in README above.
 
 ### Planned
 - 📊 Enhanced logging with filtering and export (JSON, CSV)
@@ -62,6 +63,29 @@ rsgdb --backend openocd --port 3333 --target-host localhost --target-port 3334
 arm-none-eabi-gdb
 (gdb) target extended-remote localhost:3333
 ```
+
+### Wiring: stub → rsgdb → GDB (Phase A)
+
+rsgdb is a **transparent TCP proxy**: GDB speaks RSP to rsgdb; rsgdb forwards the same bytes to your **debug stub** (OpenOCD, `gdbserver`, probe-rs GDB port, etc.). Nothing is rewritten on the wire unless you add higher layers later.
+
+| Role | Typical bind | GDB connects to |
+|------|----------------|-----------------|
+| **Stub** (OpenOCD, gdbserver, …) | `host:3334` (example) | — |
+| **rsgdb** | `0.0.0.0:3333` → `target_host:target_port` | `target extended-remote host:3333` |
+| **GDB** | — | rsgdb listen port |
+
+**Config:** `[proxy] listen_port`, `target_host`, `target_port`. **`timeout_secs`** applies only to **establishing** the TCP connection to the backend, not to idle GDB sessions (no read timeout on open connections).
+
+**Common issues**
+
+| Symptom | Things to check |
+|---------|-------------------|
+| Connection refused to rsgdb | rsgdb not running or wrong `--port` / `RSGDB_PORT`. |
+| Connection refused through rsgdb | Stub not listening on `target_host:target_port`; firewall. |
+| GDB hangs | Backend disconnected; use logs / `RUST_LOG=debug`. |
+| Windows `connect` to `0.0.0.0` | Use `127.0.0.1` or the actual listener address from `ss` / `netstat`. |
+
+**Fast RSP regression (no gdb binary):** `./scripts/e2e_rsp_regression.sh` runs codec + proxy integration tests only.
 
 ### Configuration
 
@@ -217,6 +241,7 @@ rsgdb/
 ├── scripts/validate_local.sh
 ├── scripts/e2e_gdb_smoke.sh      # gdbserver → rsgdb → gdb (batch); CI E2E job
 ├── scripts/e2e_zephyr_native_sim.sh  # optional: west build native_sim + multi-printf stepping test
+├── scripts/e2e_rsp_regression.sh     # fast: codec + proxy integration only (no gdb)
 ├── scripts/zephyr_multi_printf_app/  # tiny Zephyr app for that script (west -s)
 ├── rsgdb.toml.example
 └── .github/workflows/

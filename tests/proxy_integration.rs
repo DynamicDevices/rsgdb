@@ -198,3 +198,38 @@ async fn proxy_round_trips_two_packets_sequentially() {
     backend_task.abort();
     run.abort();
 }
+
+/// Larger payload to exercise framing through TCP (Phase A proxy hardening).
+#[tokio::test]
+async fn proxy_round_trips_medium_payload_packet() {
+    let backend = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind backend");
+    let backend_port = backend.local_addr().expect("backend addr").port();
+
+    let backend_task = tokio::spawn(echo_backend_accept_loop(backend));
+    let (proxy_listen, run) = setup_proxy_to_backend(backend_port).await;
+
+    let client = tokio::net::TcpStream::connect(connect_addr(proxy_listen))
+        .await
+        .expect("connect to proxy");
+    let mut client = Framed::new(client, GdbCodec::new());
+
+    let payload: Vec<u8> = (0u8..=240).map(|i| b'0' + (i % 10)).collect();
+    let pkt = Packet::new(payload.clone());
+    client.send(PacketOrAck::Packet(pkt)).await.expect("send");
+
+    let got = client
+        .next()
+        .await
+        .expect("stream ended")
+        .expect("decode ok");
+    match got {
+        PacketOrAck::Packet(p) => assert_eq!(p.data, payload),
+        other => panic!("expected packet, got {:?}", other),
+    }
+
+    drop(client);
+    backend_task.abort();
+    run.abort();
+}

@@ -46,6 +46,16 @@ From the repo root, run the same checks CI uses (fmt, tests with `--all-features
 
 On Windows, use **Git Bash** or **WSL** so the script runs, or run the `cargo` commands from that script by hand.
 
+### Phase A — RSP-only regression (fast, no `gdb` binary)
+
+Codec framing + proxy TCP integration tests only (~1s):
+
+```bash
+./scripts/e2e_rsp_regression.sh
+```
+
+Use this when iterating on `src/protocol/codec.rs` or `tests/proxy_integration.rs` without running the full `cargo test` suite.
+
 ### Simulated GDB session (optional, Linux/macOS)
 
 End-to-end smoke: **gdbserver → rsgdb → GDB** (batch), same shape as CI job **E2E GDB smoke**.

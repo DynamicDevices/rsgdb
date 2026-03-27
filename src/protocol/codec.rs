@@ -1,4 +1,15 @@
 //! Tokio codec for GDB RSP packet streaming
+//!
+//! ## Framing policy (Phase A / trust path)
+//!
+//! - **Packets** use `$` … `#` plus two hex checksum digits. The first `#` after `$` starts the
+//!   checksum field (GDB escapes `#` / `$` inside the payload with the `}` escape rules; valid
+//!   packets never contain a raw `#` before the final checksum).
+//! - **Incomplete** frames: the buffer is left unchanged until a full ACK/NACK or `$…#xx` is present.
+//! - **No RSP marker** (`+`, `-`, `$`) in the buffer: the decoder discards all bytes (treats as
+//!   garbage or idle data before the next frame).
+//! - **Checksum errors** surface as [`super::ProtocolError`] and do not advance the buffer past a
+//!   well-formed delimiter (see [`super::Packet::parse`]).
 
 use bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};

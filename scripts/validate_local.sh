@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Local CI parity check (Linux/macOS/Git Bash). Run from repository root.
+# Phase A RSP-only fast path: ./scripts/e2e_rsp_regression.sh (subset of what `cargo test` runs).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
