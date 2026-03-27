@@ -22,3 +22,6 @@ user = "fio"
 upload_local = "examples/board_test_app/board_test_app"
 upload_remote = "/tmp/rsgdb_board_test_app"
 program = ["gdbserver", "0.0.0.0:{port}", "/tmp/rsgdb_board_test_app"]
+# First GDB attach triggers scp+ssh+gdbserver; allow enough time on slow links.
+ready_timeout_secs = 120
+poll_interval_ms = 100
