@@ -7,10 +7,10 @@
 pub struct LoggerConfig {
     /// Log level
     pub level: String,
-    
+
     /// Output format (text, json)
     pub format: String,
-    
+
     /// Output file path
     pub output: Option<String>,
 }

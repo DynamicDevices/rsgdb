@@ -9,13 +9,13 @@ use serde::{Deserialize, Serialize};
 pub struct ProxyConfig {
     /// Port to listen on for GDB connections
     pub listen_port: u16,
-    
+
     /// Backend type (openocd, probe-rs, pyocd)
     pub backend: String,
-    
+
     /// Target host
     pub target_host: String,
-    
+
     /// Target port
     pub target_port: u16,
 }

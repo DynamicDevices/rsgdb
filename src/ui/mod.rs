@@ -7,7 +7,7 @@
 pub struct UiConfig {
     /// UI type (tui, web, none)
     pub ui_type: String,
-    
+
     /// Port for web UI
     pub web_port: Option<u16>,
 }

@@ -7,13 +7,13 @@ use thiserror::Error;
 pub enum CommandError {
     #[error("Unknown command: {0}")]
     Unknown(String),
-    
+
     #[error("Invalid command format: {0}")]
     InvalidFormat(String),
-    
+
     #[error("Invalid hex value: {0}")]
     InvalidHex(String),
-    
+
     #[error("Missing required parameter: {0}")]
     MissingParameter(String),
 }
@@ -23,51 +23,51 @@ pub enum CommandError {
 pub enum GdbCommand {
     /// Query command (q*)
     Query(QueryCommand),
-    
+
     /// Set command (Q*)
     Set(String, String),
-    
+
     /// Read registers (g)
     ReadRegisters,
-    
+
     /// Write registers (G)
     WriteRegisters(Vec<u8>),
-    
-    /// Read memory (m addr,length)
+
+    /// Read memory (m address,length)
     ReadMemory { addr: u64, len: usize },
-    
-    /// Write memory (M addr,length:XX...)
+
+    /// Write memory (M address,length:XX...)
     WriteMemory { addr: u64, data: Vec<u8> },
-    
-    /// Continue execution (c [addr])
+
+    /// Continue execution (c \[address\])
     Continue { addr: Option<u64> },
-    
-    /// Step execution (s [addr])
+
+    /// Step execution (s \[address\])
     Step { addr: Option<u64> },
-    
-    /// Insert breakpoint (Z type,addr,kind)
+
+    /// Insert breakpoint (Z type,address,kind)
     InsertBreakpoint {
         bp_type: BreakpointType,
         addr: u64,
         kind: u32,
     },
-    
-    /// Remove breakpoint (z type,addr,kind)
+
+    /// Remove breakpoint (z type,address,kind)
     RemoveBreakpoint {
         bp_type: BreakpointType,
         addr: u64,
         kind: u32,
     },
-    
+
     /// Kill request (k)
     Kill,
-    
+
     /// Detach (D)
     Detach,
-    
+
     /// vCont - Continue with actions
     VCont(VContAction),
-    
+
     /// Unknown/unsupported command
     Unsupported(String),
 }
@@ -77,25 +77,25 @@ pub enum GdbCommand {
 pub enum QueryCommand {
     /// qSupported - Feature negotiation
     Supported(Vec<String>),
-    
+
     /// qAttached - Query if attached to existing process
     Attached,
-    
+
     /// qC - Current thread ID
     CurrentThread,
-    
+
     /// qfThreadInfo - First thread info
     FirstThreadInfo,
-    
+
     /// qsThreadInfo - Subsequent thread info
     SubsequentThreadInfo,
-    
+
     /// qOffsets - Section offsets
     Offsets,
-    
+
     /// qSymbol - Symbol lookup
     Symbol(Option<String>),
-    
+
     /// Other query
     Other(String),
 }
@@ -117,7 +117,7 @@ pub enum BreakpointType {
 
 impl TryFrom<u8> for BreakpointType {
     type Error = CommandError;
-    
+
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(BreakpointType::Software),
@@ -125,7 +125,10 @@ impl TryFrom<u8> for BreakpointType {
             2 => Ok(BreakpointType::WriteWatchpoint),
             3 => Ok(BreakpointType::ReadWatchpoint),
             4 => Ok(BreakpointType::AccessWatchpoint),
-            _ => Err(CommandError::InvalidFormat(format!("Invalid breakpoint type: {}", value))),
+            _ => Err(CommandError::InvalidFormat(format!(
+                "Invalid breakpoint type: {}",
+                value
+            ))),
         }
     }
 }
@@ -151,10 +154,10 @@ impl GdbCommand {
         if data.is_empty() {
             return Err(CommandError::InvalidFormat("Empty command".to_string()));
         }
-        
+
         let cmd_str = std::str::from_utf8(data)
             .map_err(|_| CommandError::InvalidFormat("Invalid UTF-8".to_string()))?;
-        
+
         match data[0] {
             b'q' => Self::parse_query(&cmd_str[1..]),
             b'Q' => Self::parse_set(&cmd_str[1..]),
@@ -172,7 +175,7 @@ impl GdbCommand {
             _ => Ok(GdbCommand::Unsupported(cmd_str.to_string())),
         }
     }
-    
+
     fn parse_query(data: &str) -> Result<Self, CommandError> {
         if data.starts_with("Supported") {
             let features = if data.len() > 9 && data.chars().nth(9) == Some(':') {
@@ -202,105 +205,127 @@ impl GdbCommand {
             Ok(GdbCommand::Query(QueryCommand::Other(data.to_string())))
         }
     }
-    
+
     fn parse_set(data: &str) -> Result<Self, CommandError> {
         if let Some(pos) = data.find(':') {
             let key = data[..pos].to_string();
             let value = data[pos + 1..].to_string();
             Ok(GdbCommand::Set(key, value))
         } else {
-            Err(CommandError::InvalidFormat("Set command missing ':'".to_string()))
+            Err(CommandError::InvalidFormat(
+                "Set command missing ':'".to_string(),
+            ))
         }
     }
-    
+
     fn parse_write_registers(data: &str) -> Result<Self, CommandError> {
-        let bytes = hex::decode(data)
-            .map_err(|_| CommandError::InvalidHex(data.to_string()))?;
+        let bytes = hex::decode(data).map_err(|_| CommandError::InvalidHex(data.to_string()))?;
         Ok(GdbCommand::WriteRegisters(bytes))
     }
-    
+
     fn parse_read_memory(data: &str) -> Result<Self, CommandError> {
         let parts: Vec<&str> = data.split(',').collect();
         if parts.len() != 2 {
-            return Err(CommandError::InvalidFormat("Expected addr,length".to_string()));
+            return Err(CommandError::InvalidFormat(
+                "Expected addr,length".to_string(),
+            ));
         }
-        
+
         let addr = u64::from_str_radix(parts[0], 16)
             .map_err(|_| CommandError::InvalidHex(parts[0].to_string()))?;
         let len = usize::from_str_radix(parts[1], 16)
             .map_err(|_| CommandError::InvalidHex(parts[1].to_string()))?;
-        
+
         Ok(GdbCommand::ReadMemory { addr, len })
     }
-    
+
     fn parse_write_memory(data: &str) -> Result<Self, CommandError> {
         let parts: Vec<&str> = data.split(':').collect();
         if parts.len() != 2 {
-            return Err(CommandError::InvalidFormat("Expected addr,length:data".to_string()));
+            return Err(CommandError::InvalidFormat(
+                "Expected addr,length:data".to_string(),
+            ));
         }
-        
+
         let addr_len: Vec<&str> = parts[0].split(',').collect();
         if addr_len.len() != 2 {
-            return Err(CommandError::InvalidFormat("Expected addr,length".to_string()));
+            return Err(CommandError::InvalidFormat(
+                "Expected addr,length".to_string(),
+            ));
         }
-        
+
         let addr = u64::from_str_radix(addr_len[0], 16)
             .map_err(|_| CommandError::InvalidHex(addr_len[0].to_string()))?;
-        let data = hex::decode(parts[1])
-            .map_err(|_| CommandError::InvalidHex(parts[1].to_string()))?;
-        
+        let data =
+            hex::decode(parts[1]).map_err(|_| CommandError::InvalidHex(parts[1].to_string()))?;
+
         Ok(GdbCommand::WriteMemory { addr, data })
     }
-    
+
     fn parse_continue(data: &str) -> Result<Self, CommandError> {
         let addr = if data.is_empty() {
             None
         } else {
-            Some(u64::from_str_radix(data, 16)
-                .map_err(|_| CommandError::InvalidHex(data.to_string()))?)
+            Some(
+                u64::from_str_radix(data, 16)
+                    .map_err(|_| CommandError::InvalidHex(data.to_string()))?,
+            )
         };
         Ok(GdbCommand::Continue { addr })
     }
-    
+
     fn parse_step(data: &str) -> Result<Self, CommandError> {
         let addr = if data.is_empty() {
             None
         } else {
-            Some(u64::from_str_radix(data, 16)
-                .map_err(|_| CommandError::InvalidHex(data.to_string()))?)
+            Some(
+                u64::from_str_radix(data, 16)
+                    .map_err(|_| CommandError::InvalidHex(data.to_string()))?,
+            )
         };
         Ok(GdbCommand::Step { addr })
     }
-    
+
     fn parse_insert_breakpoint(data: &str) -> Result<Self, CommandError> {
         Self::parse_breakpoint_command(data, true)
     }
-    
+
     fn parse_remove_breakpoint(data: &str) -> Result<Self, CommandError> {
         Self::parse_breakpoint_command(data, false)
     }
-    
+
     fn parse_breakpoint_command(data: &str, insert: bool) -> Result<Self, CommandError> {
         let parts: Vec<&str> = data.split(',').collect();
         if parts.len() != 3 {
-            return Err(CommandError::InvalidFormat("Expected type,addr,kind".to_string()));
+            return Err(CommandError::InvalidFormat(
+                "Expected type,addr,kind".to_string(),
+            ));
         }
-        
-        let bp_type = parts[0].parse::<u8>()
+
+        let bp_type = parts[0]
+            .parse::<u8>()
             .map_err(|_| CommandError::InvalidFormat(parts[0].to_string()))?
             .try_into()?;
         let addr = u64::from_str_radix(parts[1], 16)
             .map_err(|_| CommandError::InvalidHex(parts[1].to_string()))?;
         let kind = u32::from_str_radix(parts[2], 16)
             .map_err(|_| CommandError::InvalidHex(parts[2].to_string()))?;
-        
+
         if insert {
-            Ok(GdbCommand::InsertBreakpoint { bp_type, addr, kind })
+            Ok(GdbCommand::InsertBreakpoint {
+                bp_type,
+                addr,
+                kind,
+            })
         } else {
-            Ok(GdbCommand::RemoveBreakpoint { bp_type, addr, kind })
+            Ok(GdbCommand::RemoveBreakpoint {
+                bp_type,
+                addr,
+                kind,
+            })
         }
     }
-    
+
     fn parse_v_command(data: &str) -> Result<Self, CommandError> {
         if data.starts_with("Cont") {
             // Simplified vCont parsing
@@ -324,17 +349,26 @@ mod tests {
     #[test]
     fn test_parse_read_memory() {
         let cmd = GdbCommand::parse(b"m8000,100").unwrap();
-        assert!(matches!(cmd, GdbCommand::ReadMemory { addr: 0x8000, len: 0x100 }));
+        assert!(matches!(
+            cmd,
+            GdbCommand::ReadMemory {
+                addr: 0x8000,
+                len: 0x100
+            }
+        ));
     }
 
     #[test]
     fn test_parse_insert_breakpoint() {
         let cmd = GdbCommand::parse(b"Z0,8000,2").unwrap();
-        assert!(matches!(cmd, GdbCommand::InsertBreakpoint { 
-            bp_type: BreakpointType::Software,
-            addr: 0x8000,
-            kind: 2
-        }));
+        assert!(matches!(
+            cmd,
+            GdbCommand::InsertBreakpoint {
+                bp_type: BreakpointType::Software,
+                addr: 0x8000,
+                kind: 2
+            }
+        ));
     }
 
     #[test]

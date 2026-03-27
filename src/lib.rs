@@ -22,20 +22,20 @@
 //! # }
 //! ```
 
+pub mod backends;
+pub mod breakpoints;
 pub mod config;
 pub mod error;
-pub mod proxy;
-pub mod protocol;
-pub mod breakpoints;
-pub mod state;
 pub mod logger;
-pub mod backends;
+pub mod protocol;
+pub mod proxy;
 pub mod recorder;
+pub mod state;
 pub mod ui;
 
 // Re-export commonly used types
 pub use config::Config;
-pub use error::{RsgdbError, Result};
+pub use error::{Result, RsgdbError};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn test_version() {
-        assert!(!VERSION.is_empty());
+        assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
     }
 }
 

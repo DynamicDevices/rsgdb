@@ -19,19 +19,19 @@ pub enum BreakpointType {
 pub struct Breakpoint {
     /// Unique identifier
     pub id: u32,
-    
+
     /// Optional name
     pub name: Option<String>,
-    
+
     /// Address
     pub address: u64,
-    
+
     /// Breakpoint type
     pub bp_type: BreakpointType,
-    
+
     /// Whether the breakpoint is enabled
     pub enabled: bool,
-    
+
     /// Optional condition
     pub condition: Option<String>,
 }

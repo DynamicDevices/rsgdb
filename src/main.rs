@@ -66,8 +66,7 @@ async fn main() -> anyhow::Result<()> {
         .with_line_number(true)
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("Failed to set tracing subscriber");
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
     info!("rsgdb v{} starting", env!("CARGO_PKG_VERSION"));
 
@@ -82,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
             info!("  Listen port: {}", port);
             info!("  Backend: {}", backend);
             info!("  Target: {}:{}", target_host, target_port);
-            
+
             // TODO: Implement proxy server
             println!("Proxy server functionality not yet implemented");
             println!("This will start the GDB proxy on port {}", port);
