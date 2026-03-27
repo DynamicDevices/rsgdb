@@ -183,4 +183,18 @@ mod tests {
             Some("GPIOA.MODER (4 bytes)")
         );
     }
+
+    #[test]
+    fn load_from_path_matches_parse_inline() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("minimal.svd");
+        std::fs::write(&path, MINIMAL_SVD).expect("write svd");
+        let from_file = SvdIndex::load_from_path(&path).expect("load_from_path");
+        let from_inline = SvdIndex::from_device(&svd_parser::parse(MINIMAL_SVD).expect("parse"));
+        assert_eq!(from_file.register_count(), from_inline.register_count());
+        assert_eq!(
+            from_file.lookup(0x4002_0000),
+            from_inline.lookup(0x4002_0000)
+        );
+    }
 }

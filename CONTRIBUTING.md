@@ -71,6 +71,8 @@ Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issue
 
 **CI jobs (overview):** `test` (matrix), `fmt`, `clippy`, `docs`, `e2e-gdb-smoke`, `coverage`, `build` (artifacts).
 
+**Design ADRs:** [docs/ADR-001-breakpoints-semihosting.md](docs/ADR-001-breakpoints-semihosting.md) — breakpoint policy + semihosting (Phase 2 spike).
+
 ### Remote board smoke (manual)
 
 Use this when a probe and target are available (optional OpenOCD or probe-rs GDB port):

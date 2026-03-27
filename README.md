@@ -107,7 +107,7 @@ When enabled, each GDB↔backend connection writes one **JSON Lines** file under
 
 ## 📖 Documentation
 
-Additional design docs are not published in-tree yet; see this README and [CONTRIBUTING.md](CONTRIBUTING.md).
+This README and [CONTRIBUTING.md](CONTRIBUTING.md). Design notes: [docs/ADR-001-breakpoints-semihosting.md](docs/ADR-001-breakpoints-semihosting.md) (breakpoint policy + semihosting spike).
 
 ## 🏗️ Architecture
 
