@@ -18,4 +18,10 @@ echo "==> cargo doc (deny warnings)"
 export RUSTDOCFLAGS='-D warnings'
 cargo doc --no-deps --all-features
 
+if [[ "${RUN_E2E_GDB:-}" == "1" ]]; then
+  echo "==> e2e gdb smoke (gdbserver -> rsgdb -> gdb batch)"
+  cargo build --release
+  ./scripts/e2e_gdb_smoke.sh
+fi
+
 echo "==> OK — all local checks passed."

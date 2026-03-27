@@ -46,6 +46,23 @@ From the repo root, run the same checks CI uses (fmt, tests with `--all-features
 
 On Windows, use **Git Bash** or **WSL** so the script runs, or run the `cargo` commands from that script by hand.
 
+### Simulated GDB session (optional, Linux/macOS)
+
+End-to-end smoke: **gdbserver → rsgdb → GDB** (batch), same shape as CI job **E2E GDB smoke**.
+
+Requires `gcc`, `gdb`, and `gdbserver`. On Debian/Ubuntu, `gdbserver` is often a separate package: `sudo apt-get install -y gcc gdb gdbserver`.
+
+```bash
+cargo build --release
+./scripts/e2e_gdb_smoke.sh
+```
+
+To run the same check as part of local validation (after installing the tools above):
+
+```bash
+RUN_E2E_GDB=1 ./scripts/validate_local.sh
+```
+
 ### Issue tracking
 
 Work is tracked in [GitHub issues](https://github.com/DynamicDevices/rsgdb/issues). **Blocked-by** dependencies define order (e.g. Part A **#1 → #3**; **#2** can run in parallel). Close an issue from a PR with `Closes #N` when it is fully done.

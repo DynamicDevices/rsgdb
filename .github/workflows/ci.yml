@@ -75,6 +75,24 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+  e2e-gdb-smoke:
+    name: E2E GDB smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install GDB stack
+        run: sudo apt-get update && sudo apt-get install -y gcc gdb gdbserver
+
+      - name: Build rsgdb (release)
+        run: cargo build --release --verbose
+
+      - name: Simulated session (gdbserver → rsgdb → gdb batch)
+        run: ./scripts/e2e_gdb_smoke.sh
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest
