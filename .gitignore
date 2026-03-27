@@ -5,7 +5,6 @@ examples/board_test_app/board_test_app
 /target/
 **/*.rs.bk
 *.pdb
-Cargo.lock
 
 # IDE
 .vscode/

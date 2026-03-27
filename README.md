@@ -33,7 +33,9 @@ These principles align with **zero-touch remote debugging** below and inform roa
 
 ## ✨ Key Features
 
-### Current (v0.1.0 - In Development)
+### Current (**v0.2.0-dev.1** — development release)
+
+See [`CHANGELOG.md`](CHANGELOG.md) and [`RELEASING.md`](RELEASING.md). Pre-release versions may change; pin carefully in automation.
 - ✅ GDB Remote Serial Protocol (RSP) codec + command parse (see `tests/rsp_codec_matrix.rs`)
 - ✅ Transparent TCP proxy (integration tests; forwards RSP bytes)
 - ✅ Structured logging (`tracing`, config-driven)
@@ -224,7 +226,12 @@ Enable thread-oriented logs with e.g. `RUST_LOG=rsgdb::rtos=debug,rsgdb=info` (o
 
 ## 📖 Documentation
 
-This README and [CONTRIBUTING.md](CONTRIBUTING.md). Design notes: [docs/ADR-001-breakpoints-semihosting.md](docs/ADR-001-breakpoints-semihosting.md) (breakpoint policy + semihosting spike).
+This README, [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), and [RELEASING.md](RELEASING.md) (maintainer release checklist). Design notes: [docs/ADR-001-breakpoints-semihosting.md](docs/ADR-001-breakpoints-semihosting.md) (breakpoint policy + semihosting spike).
+
+## Releases
+
+- **Development**: tagged pre-releases (e.g. **`v0.2.0-dev.1`**) are documented in [`CHANGELOG.md`](CHANGELOG.md); see [`RELEASING.md`](RELEASING.md) to cut the next tag.
+- **crates.io**: the badge above reflects the latest **published** crate; git tags may be ahead until `cargo publish` is run.
 
 ## 🏗️ Architecture
 
@@ -299,6 +306,9 @@ RUST_LOG=debug cargo run
 rsgdb/
 ├── src/                     # Library + CLI
 ├── tests/                   # Integration tests
+├── examples/board_test_app/ # remote Linux target smoke (Makefile, rsgdb.remote.toml, helper scripts)
+├── CHANGELOG.md
+├── RELEASING.md
 ├── scripts/validate_local.sh
 ├── scripts/deps_check.sh         # optional: duplicate deps, cargo audit, cargo outdated
 ├── scripts/e2e_gdb_smoke.sh      # gdbserver → rsgdb → gdb (batch); CI E2E job
@@ -364,4 +374,4 @@ You may choose either license for your use.
 
 ---
 
-**Status**: 🚧 Early development — CI green on `main` (multi-OS tests, GDB smoke, Zephyr `native_sim` E2E, native-spawn integration test with Python). Managed **native** stub spawn is in-tree; deeper probe integration and release hardening remain roadmap items; see issues above.
+**Status**: 🚧 **Development release [`v0.2.0-dev.1`](CHANGELOG.md)** — CI green on `main` (multi-OS tests, GDB smoke, Zephyr `native_sim` E2E, native-spawn integration test with Python). **`remote_ssh`** + optional **`scp`** are in-tree for Linux-on-target debugging; deeper probe integration and stable **0.2.0** crates.io publish remain roadmap items; see issues and [`RELEASING.md`](RELEASING.md).

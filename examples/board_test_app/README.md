@@ -2,6 +2,8 @@
 
 Tiny C program: infinite loop, `volatile` globals/locals you can watch in GDB (`print g_counter`, breakpoints on `printf`, etc.).
 
+Validated with rsgdb **v0.2.0-dev.1** using **`transport = remote_ssh`** and **`gdbserver`** on the target; see root [`CHANGELOG.md`](../../CHANGELOG.md).
+
 ## First-time target setup (SSH)
 
 Before debugging with **`transport = remote_ssh`** (so `scp` + `ssh` work without typing a password every time):

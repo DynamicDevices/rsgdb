@@ -54,6 +54,10 @@ From the repo root, run the same checks CI uses (fmt, tests with `--all-features
 
 This runs **`cargo tree -d`** (duplicate transitive versions — often benign, e.g. `thiserror` v1 via `svd-parser` and v2 via `tracing-appender`), **`cargo audit`** against [RustSec](https://github.com/RustSec/advisory-db) (install: `cargo install cargo-audit`), and **`cargo outdated --workspace`** if `cargo-outdated` is installed (`cargo install cargo-outdated`). Major upgrades (e.g. `toml` 0.8 → 1.x) need a deliberate PR, not blind `cargo update`.
 
+### Release tags and changelog (maintainers)
+
+Version bumps, changelog entries, and git tags are summarized in [`RELEASING.md`](RELEASING.md); user-facing notes accumulate in [`CHANGELOG.md`](CHANGELOG.md).
+
 ### Phase A — RSP-only regression (fast, no `gdb` binary)
 
 Codec framing + proxy TCP integration tests only (~1s):
