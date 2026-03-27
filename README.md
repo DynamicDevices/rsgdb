@@ -12,9 +12,9 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 **rsgdb** aims to bridge the gap between traditional GDB debugging and modern embedded development needs by providing:
 
 - **Enhanced Visibility**: Comprehensive logging of all GDB protocol traffic with structured output
-- **Advanced Breakpoint Management**: Named breakpoints, conditional expressions, and intelligent hardware/software optimization
-- **State Inspection**: Memory snapshots, register tracking, and peripheral decoding using SVD files
-- **Session Management**: Record, replay, and share debugging sessions
+- **Advanced Breakpoint Management** (roadmap): Named breakpoints, conditional expressions, and hardware/software optimization — config and parsing exist; the proxy today **forwards** breakpoint RSP unchanged
+- **State Inspection** (partial today): Peripheral/register **labels** for memory traffic via CMSIS-SVD in logs; snapshots / deep state are not implemented yet
+- **Session Management**: JSONL **recording** and **`rsgdb replay`** mock-backend playback (see below)
 - **Backend Flexibility**: Support for multiple debug probes (probe-rs, OpenOCD, pyOCD)
 - **Modern Architecture**: Built with Rust for safety, performance, and reliability
 
@@ -26,7 +26,8 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 - 🚧 Structured logging infrastructure
 - 🚧 Configuration system
 - 💾 **Session recording (rsgdb-record v1)** — ordered RSP trace as JSON Lines (`.jsonl`)
-- 📝 **SVD annotation (read-only)** — CMSIS-SVD file → log labels for memory RSP (`m` / `M`) as `Peripheral.REGISTER` (`target: rsgdb::svd`, debug level)
+- ▶️ **`rsgdb replay`** — load a recording and serve a **mock TCP backend** for one client (order-preserving playback / tests)
+- 📝 **SVD annotation (read-only)** — CMSIS-SVD → log labels for memory RSP (`m` / `M`): `Peripheral.REGISTER`, overlapping **fields**, and enumerated **variant names** where present (`target: rsgdb::svd`, debug)
 - ⚡ **`rsgdb flash`** — run a configured external flash tool (`[flash].program` with `{image}` substitution; OpenOCD/probe-rs/etc.)
 - 🧵 **RTOS RSP decode / log (Zephyr-first)** — thread-extension packets are decoded and logged at `target: rsgdb::rtos` (debug). Thread *data* comes from your stub (e.g. OpenOCD **Zephyr** RTOS awareness); other RTOSes use the same GDB RSP when the stub implements them (see below).
 - 🧪 **CI + local E2E smoke** — `gdbserver` → `rsgdb` → `gdb` (batch), `scripts/e2e_gdb_smoke.sh` (Ubuntu job in **CI** workflow). **Zephyr `native_sim`** E2E (`scripts/e2e_zephyr_native_sim.sh`) runs in the **Zephyr E2E** workflow when those scripts/app change, on `main`/`develop`, weekly, or manually. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -35,12 +36,11 @@ A modern, feature-rich GDB server/proxy written in Rust, designed to enhance emb
 
 ### Planned
 - 📊 Enhanced logging with filtering and export (JSON, CSV)
-- 🎯 Advanced breakpoint management (named, conditional, grouped)
-- 🔍 State tracking and visualization
-- 💾 Session **replay** tooling (mock backend / automated playback)
-- 🔌 Multiple backend support (probe-rs, OpenOCD)
+- 🎯 Advanced breakpoint management wired into the proxy (today: config + RSP parse; not a full manager on the wire)
+- 🔍 State tracking and visualization (beyond SVD-annotated memory logs)
+- 🔌 Native / non-TCP backends and richer probe integration ([#9](https://github.com/DynamicDevices/rsgdb/issues/9); CLI `backend_type` is reserved)
 - 🖥️ Terminal UI (TUI) for interactive debugging
-- 📝 Richer SVD decoding (fields, enums) and correlation with recordings
+- 📝 SVD: decode register **values** to enum names on the wire, and **correlation** with session recordings ([#11](https://github.com/DynamicDevices/rsgdb/issues/11) follow-ups)
 
 ## Continuous integration
 
@@ -113,9 +113,12 @@ Create a `rsgdb.toml` configuration file:
 ```toml
 [proxy]
 listen_port = 3333
-backend = "openocd"
 target_host = "localhost"
 target_port = 3334
+
+[backend]
+# Used for logging / future integration; the proxy connects over TCP to target_host:target_port
+backend_type = "openocd"
 
 [logging]
 level = "debug"
@@ -195,15 +198,15 @@ This README and [CONTRIBUTING.md](CONTRIBUTING.md). Design notes: [docs/ADR-001-
 ┌─────────────────────────────────────┐
 │         rsgdb Proxy Core            │
 │  ┌──────────┐  ┌─────────────────┐ │
-│  │ Protocol │  │ Breakpoint Mgr  │ │
-│  │  Parser  │  │                 │ │
+│  │ Protocol │  │  Breakpoints    │ │
+│  │  Parser  │  │  (roadmap)      │ │
 │  └──────────┘  └─────────────────┘ │
 │  ┌──────────┐  ┌─────────────────┐ │
-│  │  Logger  │  │  State Tracker  │ │
-│  │          │  │                 │ │
+│  │  Logger  │  │ SVD / RTOS log  │ │
+│  │          │  │ (decode only)   │ │
 │  └──────────┘  └─────────────────┘ │
 └──────────┬──────────────────────────┘
-           │ Enhanced RSP
+           │ TCP (RSP bytes forwarded)
            ▼
     ┌──────────────┐
     │Debug Backend │
