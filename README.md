@@ -50,8 +50,8 @@ cargo build --release
 ### Basic Usage
 
 ```bash
-# Start rsgdb in proxy mode
-rsgdb --backend openocd --port 3333 --target localhost:3334
+# Start rsgdb in proxy mode (forwards GDB on 3333 to OpenOCD on 3334)
+rsgdb --backend openocd --port 3333 --target-host localhost --target-port 3334
 
 # Connect with GDB
 arm-none-eabi-gdb
@@ -81,10 +81,7 @@ max_hardware = 6
 
 ## 📖 Documentation
 
-- [Architecture Overview](docs/architecture.md)
-- [GDB Protocol Reference](docs/gdb-protocol.md)
-- [User Guide](docs/user-guide.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
+Additional design docs are not published in-tree yet; see this README and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 🏗️ Architecture
 
@@ -157,9 +154,8 @@ rsgdb/
 │   ├── backends/            # Debug probe backends
 │   ├── recorder/            # Session recording
 │   └── ui/                  # User interfaces
-├── tests/                   # Integration tests
-├── examples/                # Usage examples
-└── docs/                    # Documentation
+├── rsgdb.toml.example       # Sample configuration
+└── .github/workflows/       # CI
 ```
 
 ## 🤝 Contributing

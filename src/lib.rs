@@ -13,11 +13,11 @@
 //! ## Example
 //!
 //! ```no_run
-//! use rsgdb::proxy::ProxyConfig;
+//! use rsgdb::config::ProxyConfig;
 //!
 //! # async fn example() -> anyhow::Result<()> {
-//! let config = ProxyConfig::default();
-//! // Start the proxy server
+//! let _proxy = ProxyConfig::default();
+//! // Start the proxy with `ProxyServer::new` when wiring your binary
 //! # Ok(())
 //! # }
 //! ```

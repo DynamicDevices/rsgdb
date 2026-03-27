@@ -1,101 +1,116 @@
-//! rsgdb - Enhanced GDB Server/Proxy CLI
+//! rsgdb - Enhanced GDB server/proxy
+//!
+//! Main entry point for the rsgdb application.
 
-use clap::{Parser, Subcommand};
-use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
+use clap::Parser;
+use rsgdb::config::Config;
+use rsgdb::proxy::ProxyServer;
+use std::path::PathBuf;
+use tracing::{error, info};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[derive(Parser)]
-#[command(name = "rsgdb")]
+/// Command-line arguments
+#[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct Cli {
-    /// Set the logging level
-    #[arg(short, long, default_value = "info")]
-    log_level: String,
+struct Args {
+    /// Path to configuration file
+    #[arg(short, long, value_name = "FILE")]
+    config: Option<PathBuf>,
 
-    /// Configuration file path
-    #[arg(short, long, default_value = "rsgdb.toml")]
-    config: String,
+    /// Listen port for GDB connections
+    #[arg(short, long)]
+    port: Option<u16>,
 
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
+    /// Target host to connect to
+    #[arg(short, long)]
+    target_host: Option<String>,
 
-#[derive(Subcommand)]
-enum Commands {
-    /// Start the GDB proxy server
-    Serve {
-        /// Port to listen on for GDB connections
-        #[arg(short, long, default_value = "3333")]
-        port: u16,
+    /// Target port to connect to
+    #[arg(short = 'P', long)]
+    target_port: Option<u16>,
 
-        /// Backend type (openocd, probe-rs, pyocd)
-        #[arg(short, long, default_value = "openocd")]
-        backend: String,
+    /// Debug backend type (openocd, probe-rs, pyocd); stored in config for future use
+    #[arg(long)]
+    backend: Option<String>,
 
-        /// Target host
-        #[arg(long, default_value = "localhost")]
-        target_host: String,
+    /// Enable verbose logging
+    #[arg(short, long)]
+    verbose: bool,
 
-        /// Target port
-        #[arg(long, default_value = "3334")]
-        target_port: u16,
-    },
-
-    /// Show version information
-    Version,
+    /// Enable debug logging
+    #[arg(short, long)]
+    debug: bool,
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
 
-    // Initialize logging
-    let log_level = match cli.log_level.to_lowercase().as_str() {
-        "trace" => Level::TRACE,
-        "debug" => Level::DEBUG,
-        "info" => Level::INFO,
-        "warn" => Level::WARN,
-        "error" => Level::ERROR,
-        _ => Level::INFO,
+    // Initialize tracing
+    init_tracing(args.verbose, args.debug);
+
+    info!("Starting rsgdb v{}", env!("CARGO_PKG_VERSION"));
+
+    // Load configuration
+    let mut config = if let Some(config_path) = args.config {
+        info!("Loading configuration from {:?}", config_path);
+        Config::from_file(&config_path)?
+    } else {
+        info!("Using default configuration");
+        Config::default()
     };
 
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(log_level)
-        .with_target(true)
-        .with_thread_ids(true)
-        .with_line_number(true)
-        .finish();
+    // Environment overrides file/defaults; CLI overrides env (see also merge_env docs on Config)
+    config.merge_env();
 
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
+    if let Some(port) = args.port {
+        config.proxy.listen_port = port;
+    }
+    if let Some(target_host) = args.target_host {
+        config.proxy.target_host = target_host;
+    }
+    if let Some(target_port) = args.target_port {
+        config.proxy.target_port = target_port;
+    }
+    if let Some(backend) = args.backend {
+        config.backend.backend_type = backend;
+    }
 
-    info!("rsgdb v{} starting", env!("CARGO_PKG_VERSION"));
+    config.validate()?;
 
-    match cli.command {
-        Some(Commands::Serve {
-            port,
-            backend,
-            target_host,
-            target_port,
-        }) => {
-            info!("Starting GDB proxy server");
-            info!("  Listen port: {}", port);
-            info!("  Backend: {}", backend);
-            info!("  Target: {}:{}", target_host, target_port);
+    info!("Configuration: {:?}", config);
 
-            // TODO: Implement proxy server
-            println!("Proxy server functionality not yet implemented");
-            println!("This will start the GDB proxy on port {}", port);
-        }
-        Some(Commands::Version) => {
-            println!("rsgdb version {}", env!("CARGO_PKG_VERSION"));
-            println!("Rust version: {}", env!("CARGO_PKG_RUST_VERSION"));
-        }
-        None => {
-            println!("No command specified. Use --help for usage information.");
-        }
+    // Create and run the proxy server
+    let mut server = ProxyServer::new(config.proxy).await?;
+
+    info!("Proxy server started successfully");
+    info!("Waiting for GDB connections...");
+
+    // Run the server
+    if let Err(e) = server.run().await {
+        error!("Server error: {}", e);
+        return Err(e.into());
     }
 
     Ok(())
+}
+
+/// Initialize tracing/logging
+fn init_tracing(verbose: bool, debug: bool) {
+    let filter = if debug {
+        "rsgdb=debug"
+    } else if verbose {
+        "rsgdb=info"
+    } else {
+        "rsgdb=warn"
+    };
+
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| filter.into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 }
 
 // Made with Bob

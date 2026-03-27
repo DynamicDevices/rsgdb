@@ -13,6 +13,7 @@ readme = "README.md"
 [dependencies]
 # Async runtime
 tokio = { version = "1", features = ["full"] }
+futures = "0.3"
 
 # Logging and tracing
 tracing = "0.1"

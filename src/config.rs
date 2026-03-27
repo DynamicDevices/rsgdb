@@ -269,13 +269,7 @@ impl Config {
 
     /// Validate the configuration
     pub fn validate(&self) -> ConfigResult<()> {
-        // Validate proxy config
-        if self.proxy.listen_port == 0 {
-            return Err(ConfigError::InvalidValue {
-                field: "proxy.listen_port".to_string(),
-                reason: "Port cannot be 0".to_string(),
-            });
-        }
+        // listen_port may be 0 for ephemeral bind (tests, dynamic port)
 
         if self.proxy.target_port == 0 {
             return Err(ConfigError::InvalidValue {
@@ -320,7 +314,8 @@ impl Config {
         Ok(())
     }
 
-    /// Merge with environment variables
+    /// Apply environment variables (`RSGDB_*`). Intended after loading a file; the binary applies
+    /// CLI flags after this so **CLI overrides environment**.
     pub fn merge_env(&mut self) {
         if let Ok(port) = std::env::var("RSGDB_PORT") {
             if let Ok(port) = port.parse() {
@@ -366,10 +361,17 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_port() {
+    fn test_invalid_target_port() {
+        let mut config = Config::default();
+        config.proxy.target_port = 0;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_ephemeral_listen_port_valid() {
         let mut config = Config::default();
         config.proxy.listen_port = 0;
-        assert!(config.validate().is_err());
+        assert!(config.validate().is_ok());
     }
 
     #[test]
