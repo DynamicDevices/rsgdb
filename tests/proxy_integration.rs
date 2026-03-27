@@ -7,10 +7,25 @@ use rsgdb::config::ProxyConfig;
 use rsgdb::protocol::codec::{GdbCodec, PacketOrAck};
 use rsgdb::protocol::Packet;
 use rsgdb::proxy::ProxyServer;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_util::codec::Framed;
+
+/// `TcpListener` bound to `0.0.0.0` / `::` reports that as `local_addr()`. Connecting to
+/// unspecified addresses works on Unix but fails on Windows (WSAEADDRNOTAVAIL). Use loopback
+/// for same-host test clients.
+fn connect_addr(listen: SocketAddr) -> SocketAddr {
+    match listen {
+        SocketAddr::V4(a) if a.ip().is_unspecified() => {
+            SocketAddr::new(Ipv4Addr::LOCALHOST.into(), a.port())
+        }
+        SocketAddr::V6(a) if a.ip().is_unspecified() => {
+            SocketAddr::new(Ipv6Addr::LOCALHOST.into(), a.port())
+        }
+        _ => listen,
+    }
+}
 
 async fn echo_backend_accept_loop(listener: TcpListener) {
     let (stream, _) = listener.accept().await.expect("backend accept");
@@ -60,7 +75,7 @@ async fn proxy_forwards_rsp_packet_to_backend_and_back() {
 
     let (proxy_listen, run) = setup_proxy_to_backend(backend_port).await;
 
-    let client = tokio::net::TcpStream::connect(proxy_listen)
+    let client = tokio::net::TcpStream::connect(connect_addr(proxy_listen))
         .await
         .expect("connect to proxy");
     let mut client = Framed::new(client, GdbCodec::new());
@@ -97,7 +112,7 @@ async fn proxy_round_trips_last_signal_query_packet() {
     let backend_task = tokio::spawn(echo_backend_accept_loop(backend));
     let (proxy_listen, run) = setup_proxy_to_backend(backend_port).await;
 
-    let client = tokio::net::TcpStream::connect(proxy_listen)
+    let client = tokio::net::TcpStream::connect(connect_addr(proxy_listen))
         .await
         .expect("connect to proxy");
     let mut client = Framed::new(client, GdbCodec::new());
@@ -130,7 +145,7 @@ async fn proxy_round_trips_ack_and_nack() {
     let backend_task = tokio::spawn(echo_backend_accept_loop(backend));
     let (proxy_listen, run) = setup_proxy_to_backend(backend_port).await;
 
-    let client = tokio::net::TcpStream::connect(proxy_listen)
+    let client = tokio::net::TcpStream::connect(connect_addr(proxy_listen))
         .await
         .expect("connect to proxy");
     let mut client = Framed::new(client, GdbCodec::new());
@@ -162,7 +177,7 @@ async fn proxy_round_trips_two_packets_sequentially() {
     let backend_task = tokio::spawn(echo_backend_accept_loop(backend));
     let (proxy_listen, run) = setup_proxy_to_backend(backend_port).await;
 
-    let client = tokio::net::TcpStream::connect(proxy_listen)
+    let client = tokio::net::TcpStream::connect(connect_addr(proxy_listen))
         .await
         .expect("connect to proxy");
     let mut client = Framed::new(client, GdbCodec::new());
